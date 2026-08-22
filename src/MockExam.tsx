@@ -2069,7 +2069,7 @@ export default function MockExam({
               marginBottom: "16px",
             }}
           >
-            {P2P_SESSIONS.map((sess) => {
+            {P2P_SESSIONS.map((sess: any) => {
               const isCompleted = p2pExams.some(
                 (e) => e.examCode === sess.code,
               );
@@ -4372,12 +4372,10 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
         {/* question */}
         <div
           style={{
-            flex: 1,
             display: "flex",
             flexDirection: "column",
-            justifyContent: "center",
             maxWidth: 600,
-            margin: "0 auto",
+            margin: "auto auto 0 auto",
             width: "100%",
           }}
         >
@@ -4567,13 +4565,15 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             alignItems: "center",
             justifyContent: "space-between",
             maxWidth: 600,
-            margin: "12px auto env(safe-area-inset-bottom)",
-            height: 100,
+            margin: "auto",
+            paddingTop: "12px",
+            paddingBottom: "env(safe-area-inset-bottom)",
             width: "100%",
             gap: 8,
           }}
         >
           <button
+            className="exam-nav-btn-icon-only"
             onClick={() => setCurrent(0)}
             disabled={current === 0}
             style={{
@@ -4586,13 +4586,15 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             «
           </button>
           <button
+            className="exam-nav-btn-icon-only"
             onClick={prev}
             disabled={current === 0}
             style={{ ...navBtn, flex: 1, opacity: current === 0 ? 0.35 : 1 }}
           >
-            ← Previous
+            ← <span className="exam-nav-text">Previous</span>
           </button>
           <button
+            className="exam-nav-btn-submit"
             onClick={() => setShowFinishConfirm(true)}
             style={{
               ...navBtn,
@@ -4602,9 +4604,10 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
               opacity: 0.6,
             }}
           >
-            Submit early
+            Submit <span className="exam-nav-text">early</span>
           </button>
           <button
+            className="exam-nav-btn-icon-only"
             onClick={isLast ? () => setShowFinishConfirm(true) : next}
             disabled={mode !== "end" && !answers[current]}
             style={{
@@ -4616,9 +4619,16 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
               opacity: mode === "end" || answers[current] ? 1 : 0.4,
             }}
           >
-            {isLast ? "Finish exam" : "Next →"}
+            {isLast ? (
+              "Finish exam"
+            ) : (
+              <>
+                <span className="exam-nav-text">Next</span> →
+              </>
+            )}
           </button>
           <button
+            className="exam-nav-btn-icon-only"
             onClick={() => setCurrent(questions.length - 1)}
             disabled={isLast}
             style={{
