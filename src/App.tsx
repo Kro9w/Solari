@@ -250,7 +250,7 @@ export default function App() {
     const checkUpdate = async () => {
       try {
         const response = await fetch(
-          "https://api.github.com/repos/Kro9w/CBLEL-Prep-Companion/releases/latest",
+          "https://api.github.com/repos/Kro9w/Solari/releases/latest",
         );
         if (!response.ok) return;
         const data = await response.json();

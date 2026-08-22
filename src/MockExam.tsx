@@ -62,13 +62,33 @@ const SUBJECT_SHORTS: Record<string, string> = {
 
 // ── item parser
 function parseExamCode(raw: string): string {
+  const metadata = parseExamMetadata(raw);
+  return metadata?.code || "";
+}
+
+export function parseExamMetadata(
+  raw: string,
+): { code: string; durationSeconds?: number } | null {
   const firstLine =
     raw
       .split("\n")
       .map((l) => l.trim())
       .find((l) => l.length > 0) || "";
-  const match = firstLine.match(/^([A-Z]{2,6}_\d+)$/i);
-  return match ? match[1].toUpperCase() : "";
+
+  // Match old format (e.g. LOM_1) or new format (e.g. LOM_FLEX_150)
+  const match = firstLine.match(/^([A-Z]{2,6}_[A-Z0-9]+)(?:_(\d{1,3}))?$/i);
+  if (!match) return null;
+
+  const code = match[1].toUpperCase();
+  let durationSeconds: number | undefined = undefined;
+
+  if (match[2]) {
+    const minutes = parseInt(match[2], 10);
+    const validMinutes = Math.min(minutes, 150);
+    durationSeconds = validMinutes * 60;
+  }
+
+  return { code, durationSeconds };
 }
 
 export function parseQuestions(
@@ -87,7 +107,7 @@ export function parseQuestions(
   const optionReOld = /^(\*?)([A-Da-d])[.)]\s+(.+)$/;
   const optionReNew = /^(\*?)O\.\s+(.+)$/i;
   const explanationRe = /^Y:\s+(.+)$/i;
-  const examCodeRe = /^[A-Z]{2,6}_[A-Z0-9]+$/i;
+  const examCodeRe = /^[A-Z]{2,6}_[A-Z0-9]+(_\d{1,3})?$/i;
 
   let questionCounter = 1;
 
@@ -270,10 +290,23 @@ function appendSavedExam(exam: SavedExam) {
   } catch {}
 }
 
+function formatDurationLabel(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0 && m > 0) return `${h}-hour and ${m}-minute`;
+  if (h > 0) return `${h}-hour`;
+  if (m > 0) return `${m}-minute`;
+  return `${secs}-second`;
+}
+
 // ── format helpers
 function formatTime(secs: number): string {
-  const m = Math.floor(secs / 60);
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
@@ -981,8 +1014,16 @@ export default function MockExam({
   const [elapsed, setElapsed] = useState(0);
   const [examStartTime, setExamStartTime] = useState<Date | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [customDuration, setCustomDuration] = useState<number | null>(null);
 
-  const examDuration = sessionType === "p2p" ? 7200 : 3600;
+  const examDuration =
+    sessionType === "p2p"
+      ? 7200
+      : sessionType === "quiz"
+        ? 900
+        : sessionType === "custom" && customDuration
+          ? customDuration
+          : 3600;
 
   // saved result (for save prompt)
   const [pendingExam, setPendingExam] = useState<SavedExam | null>(null);
@@ -1044,7 +1085,8 @@ export default function MockExam({
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const code = parseExamCode(text);
+      const metadata = parseExamMetadata(text);
+      const code = metadata?.code;
       const parsed = parseQuestions(text);
 
       if (!code) {
@@ -1063,6 +1105,7 @@ export default function MockExam({
       const shuffledParsed = processQuestionsSubset(parsed, parsed.length);
       setQuestions(shuffledParsed);
       setExamCode(code);
+      setCustomDuration(metadata?.durationSeconds ?? null);
       setFileName(file.name);
       setParseError("");
       setSessionType("custom");
@@ -4195,7 +4238,8 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
               <span style={{ fontSize: "calc(16px * var(--scale, 1))" }}>
                 ⏱
               </span>
-              Strict 1-hour timer. Exam auto-submits when time runs out.
+              Strict {formatDurationLabel(examDuration)} timer. Exam
+              auto-submits when time runs out.
             </div>
           )}
 
@@ -4522,16 +4566,29 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginTop: 20,
             maxWidth: 600,
-            margin: "20px auto 0",
+            margin: "12px auto env(safe-area-inset-bottom)",
+            height: 100,
             width: "100%",
+            gap: 8,
           }}
         >
           <button
+            onClick={() => setCurrent(0)}
+            disabled={current === 0}
+            style={{
+              ...navBtn,
+              padding: "9px 32px",
+              opacity: current === 0 ? 0.35 : 1,
+            }}
+            title="First question"
+          >
+            «
+          </button>
+          <button
             onClick={prev}
             disabled={current === 0}
-            style={{ ...navBtn, opacity: current === 0 ? 0.35 : 1 }}
+            style={{ ...navBtn, flex: 1, opacity: current === 0 ? 0.35 : 1 }}
           >
             ← Previous
           </button>
@@ -4552,6 +4609,7 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             disabled={mode !== "end" && !answers[current]}
             style={{
               ...navBtn,
+              flex: 1,
               background: isLast ? "var(--accent)" : "var(--cream-dark)",
               color: isLast ? "white" : "var(--ink)",
               border: isLast ? "none" : "1px solid var(--cream-border)",
@@ -4559,6 +4617,18 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
             }}
           >
             {isLast ? "Finish exam" : "Next →"}
+          </button>
+          <button
+            onClick={() => setCurrent(questions.length - 1)}
+            disabled={isLast}
+            style={{
+              ...navBtn,
+              padding: "9px 32px",
+              opacity: isLast ? 0.35 : 1,
+            }}
+            title="Last question"
+          >
+            »
           </button>
         </div>
 
@@ -5114,7 +5184,14 @@ Y: Lean management (derived from the Toyota Production System)...`}</pre>
         )}
 
         {/* actions */}
-        <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginTop: 12,
+            marginBottom: "env(safe-area-inset-bottom)",
+          }}
+        >
           <button
             onClick={startExam}
             style={{

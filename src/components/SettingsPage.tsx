@@ -45,7 +45,7 @@ export const SettingsPage: React.FC<{
     setUpdateMessage(null);
     try {
       const response = await fetch(
-        "https://api.github.com/repos/Kro9w/CBLEL-Prep-Companion/releases/latest",
+        "https://api.github.com/repos/Kro9w/Solari/releases/latest",
       );
       if (!response.ok) throw new Error("Failed to fetch latest release");
       const data = await response.json();
