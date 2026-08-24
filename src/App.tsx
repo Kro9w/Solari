@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import Dashboard from "./Dashboard";
 import MockExam from "./MockExam";
 import { loadJSON, saveJSON } from "./utils/storage";
+import { useAuth } from "./contexts/AuthContext";
+import { supabase } from "./lib/supabase";
+import { useNavigate } from "react-router-dom";
+import icon from "../icon.png";
 
 // ── default milestones
 const DEFAULT_MILESTONES = [
@@ -121,6 +125,8 @@ export function getDaysUntil(target: Date): number {
 
 // ── app
 export default function App() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const [today] = useState(() => new Date());
   const [viewDate, setViewDate] = useState(() => new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -131,6 +137,14 @@ export default function App() {
 
   const examMs = milestones.find((m) => m.id === "exam")!;
   const examDate = new Date(examMs.dateStr);
+
+  const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(",") || [];
+  const isAdmin = user?.email && adminEmails.includes(user.email);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
 
   return (
     <div
@@ -157,7 +171,18 @@ export default function App() {
           gap: 16,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img
+            src={icon}
+            alt=""
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+              flexShrink: 0,
+            }}
+          />
           <div>
             <div
               style={{
@@ -167,20 +192,57 @@ export default function App() {
                 lineHeight: 1.2,
               }}
             >
-              Live Exam Portal
+              SolariWEB Exam Portal
             </div>
             <div
               style={{
                 fontSize: "calc(12px * var(--scale, 1))",
                 color: "var(--ink-faint)",
                 marginTop: 2,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
               }}
             >
               CBLEL {examDate.getFullYear()}
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {isAdmin && (
+            <button
+              onClick={() => navigate("/admin")}
+              style={{
+                padding: "6px 12px",
+                background: "var(--cream-dark)",
+                color: "var(--ink)",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontWeight: 500,
+                fontSize: "13px",
+                transition: "all 0.2s ease",
+              }}
+            >
+              Admin Dashboard
+            </button>
+          )}
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "6px 12px",
+              background: "var(--red-bg)",
+              color: "var(--red)",
+              border: "1px solid transparent",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: "13px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            ⏻
+          </button>
+        </div>
       </header>
 
       {/* ── tabs ── */}

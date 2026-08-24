@@ -108,41 +108,35 @@ export default function Dashboard() {
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
+          borderBottom: "1px solid var(--cream-border)",
+          paddingBottom: "18px",
         }}
       >
-        <h1 style={{ fontSize: "24px", fontFamily: "var(--font-display)" }}>
-          Welcome, {displayName}
-        </h1>
         <div>
-          {isAdmin && (
-            <button
-              onClick={() => navigate("/admin")}
-              style={{
-                marginRight: "12px",
-                padding: "8px 16px",
-                background: "var(--cream-dark)",
-                border: "1px solid var(--cream-border)",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              Admin Portal
-            </button>
-          )}
-          <button
-            onClick={handleLogout}
+          <div
             style={{
-              padding: "8px 16px",
-              background: "var(--red-bg)",
-              color: "var(--red)",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
+              fontSize: "12px",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+              color: "var(--accent)",
+              fontWeight: 600,
+              marginBottom: "6px",
             }}
           >
-            Logout
-          </button>
+            Dashboard
+          </div>
+          <h1
+            style={{
+              fontSize: "32px",
+              fontFamily: "var(--font-display)",
+              color: "var(--ink)",
+              margin: 0,
+              lineHeight: 1.15,
+            }}
+          >
+            Welcome, {displayName}
+          </h1>
         </div>
       </div>
 
@@ -150,9 +144,12 @@ export default function Dashboard() {
       <div>
         <h2
           style={{
-            fontSize: "18px",
+            fontSize: "12px",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            fontWeight: 600,
             marginBottom: "16px",
-            color: "var(--ink)",
+            color: "var(--ink-muted)",
           }}
         >
           Available Live Exams
@@ -168,10 +165,11 @@ export default function Dashboard() {
                 <div
                   key={set.id}
                   style={{
-                    background: "white",
+                    background: "var(--cream-dark)",
                     padding: "20px",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     border: "1px solid var(--cream-border)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
                   }}
                 >
                   <div
@@ -180,13 +178,27 @@ export default function Dashboard() {
                       justifyContent: "space-between",
                       alignItems: "center",
                       marginBottom: "16px",
+                      gap: "12px",
+                      flexWrap: "wrap",
                     }}
                   >
-                    <div style={{ fontWeight: 600, fontSize: "16px" }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "17px",
+                        fontFamily: "var(--font-display)",
+                        color: "var(--ink)",
+                      }}
+                    >
                       {set.title}
                     </div>
                     <div
-                      style={{ fontSize: "12px", color: "var(--ink-muted)" }}
+                      style={{
+                        fontSize: "11px",
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        color: "var(--ink-faint)",
+                      }}
                     >
                       Access: {new Date(set.accessible_at).toLocaleString()}
                     </div>
@@ -217,8 +229,9 @@ export default function Dashboard() {
                           key={exam.id}
                           style={{
                             padding: "12px",
+                            background: "var(--cream)",
                             border: "1px solid var(--cream-border)",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             display: "flex",
                             flexDirection: "column",
                             gap: "8px",
@@ -251,12 +264,13 @@ export default function Dashboard() {
                                   ? "white"
                                   : "var(--ink-faint)",
                                 border: "none",
-                                borderRadius: "4px",
+                                borderRadius: "6px",
                                 cursor: isTimeWindowOpen
                                   ? "pointer"
                                   : "not-allowed",
                                 fontSize: "12px",
                                 width: "100%",
+                                transition: "background 0.2s ease",
                               }}
                             >
                               {isTimeWindowOpen
@@ -280,9 +294,9 @@ export default function Dashboard() {
       {/* Weaknesses / GWA */}
       <div
         style={{
-          background: "white",
+          background: "var(--cream-dark)",
           border: "1px solid var(--cream-border)",
-          borderRadius: "var(--radius)",
+          borderRadius: "10px",
           padding: "24px",
           display: "flex",
           flexDirection: "column",
@@ -297,7 +311,15 @@ export default function Dashboard() {
             alignItems: "center",
           }}
         >
-          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 500 }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "20px",
+              fontWeight: 500,
+              fontFamily: "var(--font-display)",
+              color: "var(--ink)",
+            }}
+          >
             Performance Statistics
           </h3>
           <select

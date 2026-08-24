@@ -50,8 +50,8 @@ export default function Signup() {
           width: "100%",
           maxWidth: "400px",
           padding: "24px",
-          background: "white",
-          borderRadius: "var(--radius)",
+          background: "var(--cream-dark)",
+          borderRadius: "10px",
           border: "1px solid var(--cream-border)",
         }}
       >
@@ -72,7 +72,7 @@ export default function Signup() {
               padding: "12px",
               background: "var(--red-bg)",
               color: "var(--red)",
-              borderRadius: "var(--radius-sm)",
+              borderRadius: "6px",
               marginBottom: "16px",
               fontSize: "14px",
             }}
@@ -105,8 +105,10 @@ export default function Signup() {
                 style={{
                   width: "100%",
                   padding: "10px 12px",
-                  borderRadius: "var(--radius-sm)",
+                  borderRadius: "6px",
                   border: "1px solid var(--cream-border)",
+                  background: "var(--cream)",
+                  color: "var(--ink)",
                   fontSize: "16px",
                   boxSizing: "border-box",
                 }}
@@ -131,8 +133,10 @@ export default function Signup() {
                 style={{
                   width: "100%",
                   padding: "10px 12px",
-                  borderRadius: "var(--radius-sm)",
+                  borderRadius: "6px",
                   border: "1px solid var(--cream-border)",
+                  background: "var(--cream)",
+                  color: "var(--ink)",
                   fontSize: "16px",
                   boxSizing: "border-box",
                 }}
@@ -158,8 +162,10 @@ export default function Signup() {
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "6px",
                 border: "1px solid var(--cream-border)",
+                background: "var(--cream)",
+                color: "var(--ink)",
                 fontSize: "16px",
               }}
             />
@@ -183,8 +189,10 @@ export default function Signup() {
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "6px",
                 border: "1px solid var(--cream-border)",
+                background: "var(--cream)",
+                color: "var(--ink)",
                 fontSize: "16px",
               }}
             />
@@ -195,10 +203,9 @@ export default function Signup() {
             style={{
               padding: "12px",
               background: "var(--accent)",
-              color: "white",
+              color: "var(--cream)",
               border: "none",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "16px",
+              borderRadius: "6px",
               fontWeight: 500,
               cursor: loading ? "not-allowed" : "pointer",
             }}

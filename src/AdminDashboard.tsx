@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { DEFAULT_SUBJECTS } from "./App";
 import { parseQuestions } from "./MockExam";
+import { useNavigate } from "react-router-dom";
+import icon from "../icon.png";
 
 type Step = "SELECT_OR_CREATE_SET" | "MANAGE_SET";
 type AdminTab = "MANAGE" | "ANALYTICS";
@@ -43,7 +45,7 @@ const ConfirmModal = ({
         style={{
           background: "var(--cream)",
           padding: "24px",
-          borderRadius: "var(--radius)",
+          borderRadius: "10px",
           border: "1px solid var(--cream-border)",
           maxWidth: "400px",
           width: "100%",
@@ -53,7 +55,8 @@ const ConfirmModal = ({
         <h3
           style={{
             margin: "0 0 16px 0",
-            fontSize: "18px",
+            fontSize: "24px",
+            fontFamily: "var(--font-display)",
             color: "var(--ink)",
           }}
         >
@@ -77,9 +80,9 @@ const ConfirmModal = ({
             disabled={loading}
             style={{
               padding: "8px 16px",
-              background: "transparent",
+              background: "var(--cream-dark)",
               border: "1px solid var(--cream-border)",
-              borderRadius: "4px",
+              borderRadius: "6px",
               cursor: loading ? "not-allowed" : "pointer",
               color: "var(--ink)",
             }}
@@ -93,7 +96,7 @@ const ConfirmModal = ({
               padding: "8px 16px",
               background: "var(--red)",
               border: "none",
-              borderRadius: "4px",
+              borderRadius: "6px",
               cursor: loading ? "not-allowed" : "pointer",
               color: "white",
               fontWeight: 500,
@@ -108,6 +111,7 @@ const ConfirmModal = ({
 };
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<AdminTab>("MANAGE");
 
   // Manage Sets State
@@ -524,11 +528,71 @@ export default function AdminDashboard() {
         loading={deleteModal.loading}
       />
 
-      <h1
-        style={{ fontSize: "24px", marginBottom: "24px", color: "var(--ink)" }}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          marginBottom: "24px",
+          gap: "16px",
+          flexWrap: "wrap",
+        }}
       >
-        Admin Dashboard
-      </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <img
+            src={icon}
+            alt=""
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 9,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+              flexShrink: 0,
+            }}
+          />
+          <div>
+            <div
+              style={{
+                fontSize: "11px",
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--accent)",
+                fontWeight: 600,
+                marginBottom: "3px",
+              }}
+            >
+              SolariWEB Exam Portal
+            </div>
+            <h1
+              style={{
+                fontSize: "24px",
+                fontFamily: "var(--font-display)",
+                margin: 0,
+                color: "var(--ink)",
+                lineHeight: 1.2,
+              }}
+            >
+              Admin Dashboard
+            </h1>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate("/")}
+          style={{
+            padding: "8px 14px",
+            background: "var(--cream-dark)",
+            color: "var(--ink)",
+            border: "1px solid var(--cream-border)",
+            borderRadius: "6px",
+            cursor: "pointer",
+            fontWeight: 500,
+            fontSize: "13px",
+            transition: "all 0.2s ease",
+          }}
+        >
+          ← Back to Dashboard
+        </button>
+      </div>
 
       {/* Tabs */}
       <div
@@ -536,22 +600,25 @@ export default function AdminDashboard() {
           display: "flex",
           borderBottom: "1px solid var(--cream-border)",
           marginBottom: "24px",
+          gap: "4px",
         }}
       >
         <button
           onClick={() => setActiveTab("MANAGE")}
           style={{
-            padding: "12px 24px",
+            padding: "12px 18px",
             background: "none",
             border: "none",
-            fontSize: "14px",
-            fontWeight: activeTab === "MANAGE" ? 600 : 400,
+            fontSize: "13px",
+            letterSpacing: "0.03em",
+            fontWeight: activeTab === "MANAGE" ? 600 : 500,
             color: activeTab === "MANAGE" ? "var(--ink)" : "var(--ink-muted)",
             borderBottom:
               activeTab === "MANAGE"
-                ? "2px solid var(--ink)"
+                ? "2px solid var(--accent)"
                 : "2px solid transparent",
             cursor: "pointer",
+            transition: "color 0.2s ease",
           }}
         >
           Manage Exam Sets
@@ -559,18 +626,20 @@ export default function AdminDashboard() {
         <button
           onClick={() => setActiveTab("ANALYTICS")}
           style={{
-            padding: "12px 24px",
+            padding: "12px 18px",
             background: "none",
             border: "none",
-            fontSize: "14px",
-            fontWeight: activeTab === "ANALYTICS" ? 600 : 400,
+            fontSize: "13px",
+            letterSpacing: "0.03em",
+            fontWeight: activeTab === "ANALYTICS" ? 600 : 500,
             color:
               activeTab === "ANALYTICS" ? "var(--ink)" : "var(--ink-muted)",
             borderBottom:
               activeTab === "ANALYTICS"
-                ? "2px solid var(--ink)"
+                ? "2px solid var(--accent)"
                 : "2px solid transparent",
             cursor: "pointer",
+            transition: "color 0.2s ease",
           }}
         >
           Analytics & Item Analysis
@@ -585,9 +654,9 @@ export default function AdminDashboard() {
             >
               <div
                 style={{
-                  background: "white",
+                  background: "var(--cream-dark)",
                   padding: "24px",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   border: "1px solid var(--cream-border)",
                 }}
               >
@@ -624,7 +693,7 @@ export default function AdminDashboard() {
                         style={{
                           padding: "16px",
                           border: "1px solid var(--cream-border)",
-                          borderRadius: "8px",
+                          borderRadius: "6px",
                           cursor: "pointer",
                           background: "var(--cream)",
                           transition: "background 0.2s",
@@ -686,9 +755,9 @@ export default function AdminDashboard() {
 
               <div
                 style={{
-                  background: "white",
+                  background: "var(--cream-dark)",
                   padding: "24px",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   border: "1px solid var(--cream-border)",
                 }}
               >
@@ -706,7 +775,7 @@ export default function AdminDashboard() {
                     style={{
                       padding: "12px",
                       marginBottom: "16px",
-                      borderRadius: "4px",
+                      borderRadius: "6px",
                       background: setMessage.includes("success")
                         ? "var(--green-bg)"
                         : "var(--red-bg)",
@@ -745,7 +814,7 @@ export default function AdminDashboard() {
                       style={{
                         width: "100%",
                         padding: "8px 12px",
-                        borderRadius: "4px",
+                        borderRadius: "6px",
                         border: "1px solid var(--cream-border)",
                       }}
                     />
@@ -769,7 +838,7 @@ export default function AdminDashboard() {
                       style={{
                         width: "100%",
                         padding: "8px 12px",
-                        borderRadius: "4px",
+                        borderRadius: "6px",
                         border: "1px solid var(--cream-border)",
                       }}
                     />
@@ -799,13 +868,20 @@ export default function AdminDashboard() {
                     disabled={creatingSet}
                     style={{
                       padding: "12px",
-                      background: "var(--accent)",
+                      background: "var(--accent-light)",
                       color: "white",
                       border: "none",
-                      borderRadius: "4px",
+                      borderRadius: "6px",
                       cursor: creatingSet ? "not-allowed" : "pointer",
                       fontWeight: 500,
+                      transition: "background 0.2s ease",
                     }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "var(--accent)")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "var(--accent-light)")
+                    }
                   >
                     {creatingSet ? "Creating..." : "Create Set & Proceed"}
                   </button>
@@ -827,7 +903,7 @@ export default function AdminDashboard() {
                     padding: "6px 12px",
                     background: "var(--cream-dark)",
                     border: "1px solid var(--cream-border)",
-                    borderRadius: "4px",
+                    borderRadius: "6px",
                     cursor: "pointer",
                   }}
                 >
@@ -842,9 +918,9 @@ export default function AdminDashboard() {
 
               <div
                 style={{
-                  background: "white",
+                  background: "var(--cream-dark)",
                   padding: "24px",
-                  borderRadius: "8px",
+                  borderRadius: "10px",
                   border: "1px solid var(--cream-border)",
                 }}
               >
@@ -900,7 +976,7 @@ export default function AdminDashboard() {
                               ? "var(--cream-dark)"
                               : "var(--cream)",
                           border: "1px solid var(--cream-border)",
-                          borderRadius: "4px",
+                          borderRadius: "6px",
                           cursor: "grab",
                           opacity: draggedItemIdx === idx ? 0.5 : 1,
                         }}
@@ -948,7 +1024,7 @@ export default function AdminDashboard() {
                               background: "var(--accent-bg)",
                               color: "var(--accent)",
                               padding: "4px 8px",
-                              borderRadius: "4px",
+                              borderRadius: "6px",
                             }}
                           >
                             150 mins
@@ -990,7 +1066,7 @@ export default function AdminDashboard() {
                         style={{
                           padding: "12px",
                           marginBottom: "16px",
-                          borderRadius: "4px",
+                          borderRadius: "6px",
                           background: uploadMessage.includes("success")
                             ? "var(--green-bg)"
                             : "var(--red-bg)",
@@ -1029,7 +1105,7 @@ export default function AdminDashboard() {
                           style={{
                             width: "100%",
                             padding: "8px 12px",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             border: "1px solid var(--cream-border)",
                           }}
                         />
@@ -1054,7 +1130,7 @@ export default function AdminDashboard() {
                           style={{
                             width: "100%",
                             padding: "8px 12px",
-                            borderRadius: "4px",
+                            borderRadius: "6px",
                             border: "1px solid var(--cream-border)",
                           }}
                         />
@@ -1078,7 +1154,7 @@ export default function AdminDashboard() {
                           background: "var(--accent)",
                           color: "white",
                           border: "none",
-                          borderRadius: "4px",
+                          borderRadius: "6px",
                           cursor: uploading ? "not-allowed" : "pointer",
                           fontWeight: 500,
                         }}
@@ -1098,9 +1174,9 @@ export default function AdminDashboard() {
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           <div
             style={{
-              background: "white",
+              background: "var(--cream-dark)",
               padding: "24px",
-              borderRadius: "8px",
+              borderRadius: "10px",
               border: "1px solid var(--cream-border)",
             }}
           >
@@ -1125,8 +1201,9 @@ export default function AdminDashboard() {
                   style={{
                     width: "100%",
                     padding: "8px 12px",
-                    borderRadius: "4px",
+                    borderRadius: "6px",
                     border: "1px solid var(--cream-border)",
+                    background: "var(--cream)",
                   }}
                 >
                   {examSets.map((s) => (
@@ -1156,8 +1233,9 @@ export default function AdminDashboard() {
                   style={{
                     width: "100%",
                     padding: "8px 12px",
-                    borderRadius: "4px",
+                    borderRadius: "6px",
                     border: "1px solid var(--cream-border)",
+                    background: "var(--cream)",
                   }}
                 >
                   <option value="ALL">
@@ -1195,9 +1273,9 @@ export default function AdminDashboard() {
                 >
                   <div
                     style={{
-                      background: "white",
+                      background: "var(--cream-dark)",
                       padding: "24px",
-                      borderRadius: "8px",
+                      borderRadius: "10px",
                       border: "1px solid var(--cream-border)",
                     }}
                   >
@@ -1237,9 +1315,10 @@ export default function AdminDashboard() {
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              padding: "8px",
+                              padding: "12px",
                               background: "var(--green-bg)",
-                              borderRadius: "4px",
+                              borderRadius: "6px",
+                              border: "1px solid var(--cream-border)",
                             }}
                           >
                             <span>{p.name}</span>
@@ -1256,9 +1335,9 @@ export default function AdminDashboard() {
 
                   <div
                     style={{
-                      background: "white",
+                      background: "var(--cream-dark)",
                       padding: "24px",
-                      borderRadius: "8px",
+                      borderRadius: "10px",
                       border: "1px solid var(--cream-border)",
                     }}
                   >
@@ -1298,11 +1377,11 @@ export default function AdminDashboard() {
                             style={{
                               display: "flex",
                               justifyContent: "space-between",
-                              padding: "8px",
+                              padding: "12px",
                               background:
-                                i < 3 ? "var(--cream-dark)" : "var(--cream)",
+                                i < 3 ? "var(--accent-bg)" : "var(--cream)",
                               border: "1px solid var(--cream-border)",
-                              borderRadius: "4px",
+                              borderRadius: "6px",
                             }}
                           >
                             <span>
@@ -1325,9 +1404,9 @@ export default function AdminDashboard() {
               {analyticsExamId !== "ALL" && analyticsExamContent && (
                 <div
                   style={{
-                    background: "white",
+                    background: "var(--cream-dark)",
                     padding: "24px",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     border: "1px solid var(--cream-border)",
                   }}
                 >
@@ -1363,7 +1442,7 @@ export default function AdminDashboard() {
                         style={{
                           padding: "24px",
                           border: "1px solid var(--cream-border)",
-                          borderRadius: "6px",
+                          borderRadius: "10px",
                           background: "var(--cream)",
                         }}
                       >
@@ -1415,9 +1494,9 @@ export default function AdminDashboard() {
                                   padding: "12px 16px",
                                   background: isCorrect
                                     ? "var(--green-bg)"
-                                    : "white",
+                                    : "var(--cream-dark)",
                                   border: `1px solid ${isCorrect ? "var(--green)" : "var(--cream-border)"}`,
-                                  borderRadius: "8px",
+                                  borderRadius: "6px",
                                 }}
                               >
                                 <div
@@ -1498,7 +1577,7 @@ export default function AdminDashboard() {
                                 padding: "12px 16px",
                                 background: "var(--cream-dark)",
                                 border: "1px dashed var(--cream-border)",
-                                borderRadius: "8px",
+                                borderRadius: "6px",
                               }}
                             >
                               <div

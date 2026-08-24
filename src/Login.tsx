@@ -42,8 +42,8 @@ export default function Login() {
           width: "100%",
           maxWidth: "400px",
           padding: "24px",
-          background: "white",
-          borderRadius: "var(--radius)",
+          background: "var(--cream-dark)",
+          borderRadius: "10px",
           border: "1px solid var(--cream-border)",
         }}
       >
@@ -96,8 +96,10 @@ export default function Login() {
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "6px",
                 border: "1px solid var(--cream-border)",
+                background: "var(--cream)",
+                color: "var(--ink)",
                 fontSize: "16px",
               }}
             />
@@ -121,8 +123,10 @@ export default function Login() {
               style={{
                 width: "100%",
                 padding: "10px 12px",
-                borderRadius: "var(--radius-sm)",
+                borderRadius: "6px",
                 border: "1px solid var(--cream-border)",
+                background: "var(--cream)",
+                color: "var(--ink)",
                 fontSize: "16px",
               }}
             />
@@ -133,12 +137,13 @@ export default function Login() {
             style={{
               padding: "12px",
               background: "var(--accent)",
-              color: "white",
+              color: "var(--cream)",
               border: "none",
-              borderRadius: "var(--radius-sm)",
+              borderRadius: "6px",
               fontSize: "16px",
               fontWeight: 500,
               cursor: loading ? "not-allowed" : "pointer",
+              transition: "background 0.2s ease",
             }}
           >
             {loading ? "Logging in..." : "Log in"}

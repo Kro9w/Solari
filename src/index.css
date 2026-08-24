@@ -766,3 +766,83 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .app-container.fullscreen-exam {
   padding-bottom: 0 !important;
 }
+
+/* ── Auth (Login / Signup) editorial layout ── */
+.auth-brand-panel {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .auth-brand-panel {
+    display: flex !important;
+  }
+  .auth-mobile-mark {
+    display: none !important;
+  }
+}
+
+.auth-field-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 600;
+}
+
+.auth-input {
+  width: 100%;
+  padding: 10px 2px;
+  border: none;
+  border-bottom: 1px solid var(--cream-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  font-family: var(--font-body);
+  transition: border-color 0.2s ease;
+}
+
+.auth-input:focus {
+  outline: none;
+  border-bottom-color: var(--accent);
+}
+
+.auth-submit-btn {
+  padding: 13px;
+  background: var(--ink);
+  color: var(--cream);
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    transform 0.15s ease;
+}
+
+.auth-submit-btn:hover:not(:disabled) {
+  background: var(--accent);
+}
+
+.auth-submit-btn:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.auth-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.auth-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-link:hover {
+  text-decoration: underline;
+}
