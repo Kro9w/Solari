@@ -6,15 +6,29 @@ datasource db {
   provider  = "postgresql"
 }
 
+model ExamSet {
+  id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title         String
+  accessible_at DateTime  @db.Timestamptz(6)
+  is_public     Boolean   @default(false)
+  created_at    DateTime? @default(now()) @db.Timestamptz(6)
+  
+  exams         Exam[]
+
+  @@map("exam_sets")
+}
+
 model Exam {
   id               String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  exam_set_id      String       @db.Uuid
   title            String
   subject_code     String
   file_content     String
   accessible_at    DateTime     @db.Timestamptz(6)
-  duration_minutes Int          @default(60)
+  duration_minutes Int          @default(150)
   created_at       DateTime?    @default(now()) @db.Timestamptz(6)
   
+  exam_set         ExamSet      @relation(fields: [exam_set_id], references: [id])
   exam_results     ExamResult[]
 
   @@map("exams")
@@ -23,6 +37,7 @@ model Exam {
 model ExamResult {
   id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   user_id       String    @db.Uuid
+  user_name     String?
   exam_id       String    @db.Uuid
   score         Int
   correct_count Int
@@ -32,8 +47,6 @@ model ExamResult {
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
   
   exam          Exam      @relation(fields: [exam_id], references: [id])
-  // user_id references auth.users in Supabase, but Prisma cannot easily model external schemas out-of-the-box in the same file without multi-schema preview features. 
-  // We'll leave it as a regular String/UUID for Prisma's awareness.
 
   @@map("exam_results")
 }

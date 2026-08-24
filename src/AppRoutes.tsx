@@ -36,7 +36,13 @@ const ProtectedRoute = ({
     return <Navigate to="/login" replace />;
   }
 
-  // Assuming for this MVP, you might want to protect /admin further. For now, it's authenticated.
+  if (requireAdmin) {
+    const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(",") || [];
+    if (!adminEmails.includes(session.user.email)) {
+      return <Navigate to="/" replace />;
+    }
+  }
+
   return <>{children}</>;
 };
 
@@ -69,7 +75,7 @@ export function AppRoutes() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <AdminDashboard />
               </ProtectedRoute>
             }

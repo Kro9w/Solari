@@ -20,13 +20,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       </button>
 
       <button
-        className={`nav-item ${activeTab === "practice" ? "active" : ""}`}
-        onClick={() => setActiveTab("practice")}
-      >
-        <BookOpen size={20} />
-      </button>
-
-      <button
         className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
         onClick={() => setActiveTab("settings")}
       >

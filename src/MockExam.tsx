@@ -2,10 +2,12 @@ import { useState, useEffect, useRef } from "react";
 import { supabase } from "./lib/supabase";
 import { useAuth } from "./contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
+import { Bookmark } from "lucide-react";
 
 export type Option = { letter: string; text: string; correct: boolean };
 export type Question = {
   number: number;
+  originalIndex: number;
   stem: string;
   options: Option[];
   explanation?: string;
@@ -63,7 +65,12 @@ export function parseQuestions(raw: string): Question[] {
         questions.push(current as Question);
 
       const stemText = qMatchNew[1];
-      current = { number: questionCounter++, stem: stemText, options: [] };
+      current = {
+        number: questionCounter++,
+        originalIndex: questionCounter - 2,
+        stem: stemText,
+        options: [],
+      };
     } else if (oMatchNew && current) {
       const isCorrect = oMatchNew[1] === "*";
       const text = oMatchNew[2].trim();
@@ -115,6 +122,18 @@ function formatTime(secs: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+const navBtnStyle = {
+  padding: "12px 24px",
+  background: "var(--cream-dark)",
+  color: "var(--ink)",
+  border: "1px solid var(--cream-border)",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: 500,
+  fontSize: "14px",
+  transition: "all 0.15s ease",
+};
+
 export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const { examId } = useParams();
   const navigate = useNavigate();
@@ -127,6 +146,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [bookmarks, setBookmarks] = useState<number[]>([]);
   const [phase, setPhase] = useState<"load" | "exam" | "review">("load");
   const [examDuration, setExamDuration] = useState(3600);
   const [elapsed, setElapsed] = useState(0);
@@ -200,6 +220,14 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     setAnswers((prev) => ({ ...prev, [current]: letter }));
   }
 
+  function toggleBookmark() {
+    setBookmarks((prev) =>
+      prev.includes(current)
+        ? prev.filter((b) => b !== current)
+        : [...prev, current],
+    );
+  }
+
   async function finishExam(timeTaken: number) {
     if (timerRef.current) clearInterval(timerRef.current);
 
@@ -211,14 +239,27 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     const score = Math.round((correctCount / questions.length) * 100);
     setScorePercent(score);
 
+    const userName = user?.user_metadata?.first_name
+      ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
+      : "Student";
+
+    // Re-map answers from shuffled index to original index for item analysis
+    const originalIndexedAnswers: Record<number, string> = {};
+    Object.keys(answers).forEach((shuffledIdx) => {
+      const q = questions[parseInt(shuffledIdx, 10)];
+      originalIndexedAnswers[q.originalIndex] =
+        answers[parseInt(shuffledIdx, 10)];
+    });
+
     try {
       await supabase.from("exam_results").insert({
         user_id: user?.id,
+        user_name: userName,
         exam_id: examId,
         score,
         correct_count: correctCount,
         total_count: questions.length,
-        answers: answers,
+        answers: originalIndexedAnswers,
         time_taken: timeTaken,
       });
     } catch (err) {
@@ -230,93 +271,285 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   if (loading) return <div style={{ padding: "24px" }}>Loading exam...</div>;
   if (error)
-    return <div style={{ padding: "24px", color: "red" }}>{error}</div>;
+    return <div style={{ padding: "24px", color: "var(--red)" }}>{error}</div>;
 
   if (phase === "exam" && questions.length > 0) {
     const q = questions[current];
-    const isLast = current === questions.length - 1;
     const remaining = examDuration - elapsed;
+    const answeredCount = Object.keys(answers).length;
 
     return (
-      <div style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          background: "var(--cream)",
+        }}
+      >
+        {/* Top Header */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: "16px",
+            padding: "20px 24px",
+            paddingBottom: "12px",
+            borderBottom: "none",
           }}
         >
-          <div>
-            {examCode} - Q {current + 1} of {questions.length}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "8px",
+            }}
+          >
+            <div style={{ fontSize: "16px", color: "var(--ink-muted)" }}>
+              <span style={{ color: "var(--ink)", fontWeight: 500 }}>
+                {examCode}
+              </span>{" "}
+              · Full exam
+            </div>
+            <div style={{ fontSize: "16px", color: "var(--ink)" }}>
+              {formatTime(remaining)}
+            </div>
           </div>
-          <div style={{ color: remaining <= 300 ? "red" : "black" }}>
-            Time: {formatTime(remaining)}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "8px",
+              fontSize: "14px",
+              color: "var(--ink-muted)",
+            }}
+          >
+            <div>
+              {answeredCount}/{questions.length} answered
+            </div>
+            <div>
+              {current + 1}/{questions.length}
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div
+            style={{
+              height: "4px",
+              background: "var(--cream-dark)",
+              borderRadius: "2px",
+              width: "100%",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                background: "var(--sienna)",
+                width: `${((current + 1) / questions.length) * 100}%`,
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+
+          {/* Bookmarks */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginTop: "24px",
+            }}
+          >
+            <button
+              style={{
+                padding: "6px 16px",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "6px",
+                background: "var(--cream-dark)",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "14px",
+                color: "var(--ink-muted)",
+                cursor: "pointer",
+              }}
+            >
+              <Bookmark size={16} fill="currentColor" /> Bookmarks (
+              {bookmarks.length})
+            </button>
           </div>
         </div>
 
-        <div
-          style={{
-            background: "var(--cream)",
-            padding: "24px",
-            borderRadius: "8px",
-            marginBottom: "16px",
-            border: "1px solid var(--cream-border)",
-          }}
-        >
-          <p
-            style={{ fontSize: "16px", fontWeight: 500, marginBottom: "16px" }}
+        {/* Scrollable Question Content */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 24px" }}>
+          <div
+            style={{
+              maxWidth: "700px",
+              margin: "0 auto",
+              paddingBottom: "100px",
+            }}
           >
-            {q.stem}
-          </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            {q.options.map((opt) => (
-              <button
-                key={opt.letter}
-                onClick={() => choose(opt.letter)}
+            {/* Question Card */}
+            <div
+              style={{
+                background: "white",
+                border: "1px solid var(--cream-border)",
+                borderRadius: "12px",
+                padding: "24px",
+                marginTop: "16px",
+                marginBottom: "24px",
+                position: "relative",
+              }}
+            >
+              <div
                 style={{
-                  textAlign: "left",
-                  padding: "12px",
-                  background:
-                    answers[current] === opt.letter
-                      ? "var(--accent-bg)"
-                      : "white",
-                  border: `1px solid ${answers[current] === opt.letter ? "var(--accent)" : "var(--cream-border)"}`,
-                  borderRadius: "4px",
-                  cursor: "pointer",
+                  fontSize: "14px",
+                  color: "var(--ink-muted)",
+                  marginBottom: "16px",
                 }}
               >
-                <strong>{opt.letter}.</strong> {opt.text}
+                Question {current + 1}
+              </div>
+
+              <button
+                onClick={toggleBookmark}
+                style={{
+                  position: "absolute",
+                  top: "20px",
+                  right: "20px",
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
+                  color: bookmarks.includes(current)
+                    ? "var(--sienna)"
+                    : "var(--cream-dark)",
+                  padding: 0,
+                }}
+              >
+                <Bookmark
+                  size={24}
+                  fill={bookmarks.includes(current) ? "currentColor" : "none"}
+                  strokeWidth={bookmarks.includes(current) ? 0 : 2}
+                />
               </button>
-            ))}
+
+              <div
+                style={{
+                  fontSize: "18px",
+                  color: "var(--ink)",
+                  lineHeight: 1.5,
+                }}
+              >
+                {q.stem}
+              </div>
+            </div>
+
+            {/* Options */}
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+            >
+              {q.options.map((opt) => {
+                const isSelected = answers[current] === opt.letter;
+                return (
+                  <div
+                    key={opt.letter}
+                    onClick={() => choose(opt.letter)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "16px",
+                      background: "white",
+                      border: `1px solid ${isSelected ? "var(--ink)" : "var(--cream-border)"}`,
+                      borderRadius: "8px",
+                      cursor: "pointer",
+                      gap: "16px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "50%",
+                        border: `1px solid ${isSelected ? "var(--ink)" : "var(--ink-muted)"}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "14px",
+                        fontWeight: 500,
+                        color: isSelected ? "var(--ink)" : "var(--ink-muted)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {opt.letter}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "16px",
+                        color: "var(--ink)",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {opt.text}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+        {/* Bottom Navigation */}
+        <div
+          style={{
+            padding: "20px 24px",
+            background: "var(--cream)",
+            borderTop: "none",
+            display: "flex",
+            justifyContent: "center",
+            gap: "12px",
+            paddingBottom: "env(safe-area-inset-bottom, 24px)",
+          }}
+        >
+          <button
+            disabled={current === 0}
+            onClick={() => setCurrent(0)}
+            style={{ ...navBtnStyle, opacity: current === 0 ? 0.5 : 1 }}
+          >
+            «
+          </button>
           <button
             disabled={current === 0}
             onClick={() => setCurrent((c) => c - 1)}
-            style={{
-              padding: "8px 16px",
-              cursor: current === 0 ? "not-allowed" : "pointer",
-            }}
+            style={{ ...navBtnStyle, opacity: current === 0 ? 0.5 : 1 }}
           >
-            Previous
+            ← Previous
           </button>
 
           <button
-            onClick={() =>
-              isLast ? finishExam(elapsed) : setCurrent((c) => c + 1)
-            }
+            onClick={() => finishExam(elapsed)}
+            style={{ ...navBtnStyle }}
+          >
+            Submit early
+          </button>
+
+          <button
+            disabled={current === questions.length - 1}
+            onClick={() => setCurrent((c) => c + 1)}
             style={{
-              padding: "8px 16px",
-              background: isLast ? "var(--accent)" : "var(--cream-dark)",
-              color: isLast ? "white" : "black",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
+              ...navBtnStyle,
+              opacity: current === questions.length - 1 ? 0.5 : 1,
             }}
           >
-            {isLast ? "Submit Exam" : "Next"}
+            Next →
+          </button>
+          <button
+            disabled={current === questions.length - 1}
+            onClick={() => setCurrent(questions.length - 1)}
+            style={{
+              ...navBtnStyle,
+              opacity: current === questions.length - 1 ? 0.5 : 1,
+            }}
+          >
+            »
           </button>
         </div>
       </div>
@@ -352,7 +585,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           style={{
             marginTop: "24px",
             padding: "12px 24px",
-            background: "var(--accent)",
+            background: "var(--ink)",
             color: "white",
             border: "none",
             borderRadius: "4px",

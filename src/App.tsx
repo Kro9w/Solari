@@ -121,44 +121,20 @@ export function getDaysUntil(target: Date): number {
 
 // ── app
 export default function App() {
-  const [userName, setUserName] = useState<string | null>(() =>
-    loadJSON("userName", "Student"),
-  );
-  const [startDateStr, setStartDateStr] = useState<string | null>(() =>
-    loadJSON("startDateStr", new Date().toISOString()),
-  );
-  const [subjects, setSubjects] =
-    useState<typeof DEFAULT_SUBJECTS>(loadSubjects);
-  const [cycleLength, setCycleLength] = useState<number>(() =>
-    loadJSON("cycleLength", 6),
-  );
-  const [studyDays, setStudyDays] = useState<number[]>(() =>
-    loadJSON("studyDays", [1, 2, 3, 4, 5, 6]),
-  );
-
   const [today] = useState(() => new Date());
   const [viewDate, setViewDate] = useState(() => new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [isMockExamActive, setIsMockExamActive] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"dashboard" | "practice">(
-    "dashboard",
-  );
-
-  function switchTab(newTab: typeof activeTab) {
-    setActiveTab(newTab);
-  }
-
   const [milestones, setMilestones] = useState<MilestoneData[]>(loadMilestones);
 
-  const restDay = isRestDay(viewDate, studyDays);
   const examMs = milestones.find((m) => m.id === "exam")!;
   const examDate = new Date(examMs.dateStr);
 
   return (
     <div
-      className={`app-container ${activeTab === "practice" && isMockExamActive ? "fullscreen-exam" : ""}`}
+      className="app-container"
       style={{
         height: "100dvh",
         width: "100%",
@@ -171,113 +147,83 @@ export default function App() {
       }}
     >
       {/* ── header ── */}
-      {!(activeTab === "practice" && isMockExamActive) && (
-        <header
-          style={{
-            padding: "14px 24px",
-            borderBottom: "1px solid var(--cream-border)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 16,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center" }}>
-            <div>
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "calc(22px * var(--scale, 1))",
-                  color: "var(--ink)",
-                  lineHeight: 1.2,
-                }}
-              >
-                Live Exam Portal
-              </div>
-              <div
-                style={{
-                  fontSize: "calc(12px * var(--scale, 1))",
-                  color: "var(--ink-faint)",
-                  marginTop: 2,
-                }}
-              >
-                CBLEL {examDate.getFullYear()}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}></div>
-        </header>
-      )}
-
-      {/* ── tabs ── */}
-      {!(activeTab === "practice" && isMockExamActive) && (
-        <div
-          className="desktop-tabs"
-          style={{
-            display: "flex",
-            borderBottom: "1px solid var(--cream-border)",
-            padding: "0 24px",
-            overflowX: "auto",
-          }}
-        >
-          {(["dashboard", "practice"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                switchTab(tab);
-              }}
+      <header
+        style={{
+          padding: "14px 24px",
+          borderBottom: "1px solid var(--cream-border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <div>
+            <div
               style={{
-                fontFamily: "var(--font-body)",
-                fontSize: "calc(13px * var(--scale, 1))",
-                padding: "10px 14px",
-                background: "none",
-                border: "none",
-                whiteSpace: "nowrap",
-                borderBottom:
-                  activeTab === tab
-                    ? "2px solid var(--ink)"
-                    : "2px solid transparent",
-                color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
-                cursor: "pointer",
-                fontWeight: activeTab === tab ? 500 : 400,
-                transition: "color 0.15s",
-                textTransform: "capitalize",
+                fontFamily: "var(--font-display)",
+                fontSize: "calc(22px * var(--scale, 1))",
+                color: "var(--ink)",
+                lineHeight: 1.2,
               }}
             >
-              {tab}
-            </button>
-          ))}
+              Live Exam Portal
+            </div>
+            <div
+              style={{
+                fontSize: "calc(12px * var(--scale, 1))",
+                color: "var(--ink-faint)",
+                marginTop: 2,
+              }}
+            >
+              CBLEL {examDate.getFullYear()}
+            </div>
+          </div>
         </div>
-      )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}></div>
+      </header>
+
+      {/* ── tabs ── */}
+      <div
+        className="desktop-tabs"
+        style={{
+          display: "flex",
+          borderBottom: "1px solid var(--cream-border)",
+          padding: "0 24px",
+          overflowX: "auto",
+        }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--font-body)",
+            fontSize: "calc(13px * var(--scale, 1))",
+            padding: "10px 14px",
+            background: "none",
+            border: "none",
+            whiteSpace: "nowrap",
+            borderBottom: "2px solid var(--ink)",
+            color: "var(--ink)",
+            fontWeight: 500,
+            textTransform: "capitalize",
+          }}
+        >
+          dashboard
+        </div>
+      </div>
 
       {/* ── main ── */}
       <main
-        key={activeTab}
         className="fade-in"
         style={{
           flex: 1,
           minHeight: 0 /* crucial for nested flex scrolling */,
           overflowY: "auto",
-          padding:
-            activeTab === "dashboard" || activeTab === "practice"
-              ? 0
-              : "20px 24px",
+          padding: 0,
           display: "block",
           flexDirection: "column",
         }}
       >
-        {activeTab === "dashboard" && (
-          <Dashboard
-            userName={userName}
-            startDateStr={startDateStr}
-            subjects={subjects}
-            milestones={milestones}
-            cycleLength={cycleLength}
-            studyDays={studyDays}
-            onNavigateToPractice={() => switchTab("practice")}
-          />
-        )}
-        {activeTab === "practice" && <MockExam isRestDay={restDay} />}
+        <Dashboard />
       </main>
     </div>
   );
