@@ -1,183 +1,284 @@
 import { useState, useEffect } from "react";
 import Dashboard from "./Dashboard";
 import MockExam from "./MockExam";
-import Admin from "./Admin";
-import Auth from "./Auth";
-import { BottomNav } from "./components/BottomNav";
-import { SettingsPage } from "./components/SettingsPage";
 import { loadJSON, saveJSON } from "./utils/storage";
-import { supabase } from "./utils/supabase";
 
-export default function App() {
-  const [session, setSession] = useState<any>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
+// ── default milestones
+const DEFAULT_MILESTONES = [
+  {
+    id: "registration",
+    label: "Board Registration",
+    dateStr: "June 05 - August 04",
+    color: "var(--green)",
+    bg: "var(--green-bg)",
+  },
+  {
+    id: "exam",
+    label: "CBLEL Exam",
+    dateStr: "2026-09-03",
+    color: "var(--accent)",
+    bg: "var(--accent-bg)",
+  },
+];
 
-  const [activeTab, setActiveTab] = useState(() => {
-    return loadJSON<string>("activeTab", "dashboard");
+export type MilestoneData = (typeof DEFAULT_MILESTONES)[number];
+
+function loadMilestones(): MilestoneData[] {
+  return loadJSON("milestones", DEFAULT_MILESTONES);
+}
+function saveMilestones(ms: MilestoneData[]) {
+  saveJSON("milestones", ms);
+}
+
+// ── subjects
+export const DEFAULT_SUBJECTS = [
+  { name: "Library Organization and Management", short: "LOM", weight: 20 },
+  {
+    name: "Reference, Bibliography, and User Services",
+    short: "RBU",
+    weight: 20,
+  },
+  { name: "Cataloging and Classification", short: "CC", weight: 20 },
+  { name: "Indexing and Abstracting", short: "IA", weight: 15 },
+  {
+    name: "Collection Management (Selection and Acquisition)",
+    short: "CM",
+    weight: 15,
+  },
+  { name: "Information Technology", short: "IT", weight: 10 },
+];
+
+export function loadSubjects() {
+  // Gracefully merge missing weights for existing users
+  const loaded: typeof DEFAULT_SUBJECTS = loadJSON(
+    "subjects",
+    DEFAULT_SUBJECTS,
+  );
+  return loaded.map((s) => {
+    if (s.weight) return s;
+    const defaultSub = DEFAULT_SUBJECTS.find((ds) => ds.short === s.short);
+    return { ...s, weight: defaultSub ? defaultSub.weight : 0 };
   });
+}
 
-  const [darkMode, setDarkMode] = useState(() =>
-    loadJSON<boolean>("darkMode", true),
+export function isRestDay(
+  date: Date,
+  studyDays: number[] = [1, 2, 3, 4, 5, 6],
+) {
+  return !studyDays.includes(date.getDay());
+}
+
+export function getSubjectForDate(
+  date: Date,
+  startDateStr: string,
+  subjects: typeof DEFAULT_SUBJECTS,
+  cycleLength: number = 6,
+  studyDays: number[] = [1, 2, 3, 4, 5, 6],
+): {
+  subject: string;
+  short: string;
+  weekNum: number;
+  idx: number;
+  weight?: number;
+} {
+  if (isRestDay(date, studyDays))
+    return { subject: "Rest day", short: "Rest", weekNum: 0, idx: -1 };
+
+  const ref = new Date(startDateStr);
+  ref.setHours(0, 0, 0, 0);
+  const target = new Date(date);
+  target.setHours(0, 0, 0, 0);
+
+  // Count how many valid study days have passed since the start date
+  let validDaysPassed = 0;
+  const d = new Date(ref);
+  while (d < target) {
+    if (!isRestDay(d, studyDays)) {
+      validDaysPassed++;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+
+  const cycleNum = Math.floor(Math.max(validDaysPassed, 0) / cycleLength);
+  const idx = cycleNum % subjects.length;
+  const s = subjects[idx];
+  return {
+    subject: s.name,
+    short: s.short,
+    weekNum: cycleNum + 1,
+    idx,
+    weight: s.weight,
+  };
+}
+
+export function getDaysUntil(target: Date): number {
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const t = new Date(target);
+  t.setHours(0, 0, 0, 0);
+  return Math.ceil((t.getTime() - now.getTime()) / 86400000);
+}
+
+// ── app
+export default function App() {
+  const [userName, setUserName] = useState<string | null>(() =>
+    loadJSON("userName", "Student"),
   );
-  const [simpleFont, setSimpleFont] = useState(() =>
-    loadJSON<boolean>("simpleFont", false),
+  const [startDateStr, setStartDateStr] = useState<string | null>(() =>
+    loadJSON("startDateStr", new Date().toISOString()),
   );
-  const [fontSize, setFontSize] = useState<"S" | "M" | "L">(() =>
-    loadJSON<"S" | "M" | "L">("fontSize", "M"),
+  const [subjects, setSubjects] =
+    useState<typeof DEFAULT_SUBJECTS>(loadSubjects);
+  const [cycleLength, setCycleLength] = useState<number>(() =>
+    loadJSON("cycleLength", 6),
   );
+  const [studyDays, setStudyDays] = useState<number[]>(() =>
+    loadJSON("studyDays", [1, 2, 3, 4, 5, 6]),
+  );
+
+  const [today] = useState(() => new Date());
+  const [viewDate, setViewDate] = useState(() => new Date());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [isMockExamActive, setIsMockExamActive] = useState(false);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setLoadingSession(false);
-    });
+  const [activeTab, setActiveTab] = useState<"dashboard" | "practice">(
+    "dashboard",
+  );
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    saveJSON("activeTab", activeTab);
-  }, [activeTab]);
-
-  useEffect(() => {
-    document.documentElement.className = darkMode ? "dark" : "light";
-    saveJSON("darkMode", darkMode);
-  }, [darkMode]);
-
-  useEffect(() => {
-    if (simpleFont) {
-      document.documentElement.style.setProperty(
-        "--font-display",
-        "'Inter', system-ui, sans-serif",
-      );
-      document.documentElement.style.setProperty(
-        "--font-body",
-        "'Inter', system-ui, sans-serif",
-      );
-    } else {
-      document.documentElement.style.setProperty(
-        "--font-display",
-        "'Newsreader', serif",
-      );
-      document.documentElement.style.setProperty(
-        "--font-body",
-        "'Inter', system-ui, sans-serif",
-      );
-    }
-    saveJSON("simpleFont", simpleFont);
-  }, [simpleFont]);
-
-  useEffect(() => {
-    const scaleMap = { S: 0.9, M: 1, L: 1.1 };
-    document.documentElement.style.setProperty(
-      "--scale",
-      scaleMap[fontSize].toString(),
-    );
-    saveJSON("fontSize", fontSize);
-  }, [fontSize]);
-
-  if (loadingSession) {
-    return <div style={{ padding: 24 }}>Loading...</div>;
+  function switchTab(newTab: typeof activeTab) {
+    setActiveTab(newTab);
   }
 
-  if (!session) {
-    return <Auth onAuthSuccess={() => {}} />;
-  }
+  const [milestones, setMilestones] = useState<MilestoneData[]>(loadMilestones);
 
-  // Handle direct admin route (requires login)
-  if (window.location.pathname === "/admin") {
-    return <Admin />;
-  }
+  const restDay = isRestDay(viewDate, studyDays);
+  const examMs = milestones.find((m) => m.id === "exam")!;
+  const examDate = new Date(examMs.dateStr);
 
   return (
-    <div className={`app-container ${isMockExamActive ? "fullscreen" : ""}`}>
+    <div
+      className={`app-container ${activeTab === "practice" && isMockExamActive ? "fullscreen-exam" : ""}`}
+      style={{
+        height: "100dvh",
+        width: "100%",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        background: "var(--cream)",
+        color: "var(--ink)",
+        transition: "background 0.2s, color 0.2s",
+      }}
+    >
       {/* ── header ── */}
-      {!isMockExamActive && (
+      {!(activeTab === "practice" && isMockExamActive) && (
         <header
           style={{
-            padding: "16px 20px",
+            padding: "14px 24px",
+            borderBottom: "1px solid var(--cream-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            paddingTop: "max(16px, env(safe-area-inset-top))",
-            flexShrink: 0,
-            background: "var(--cream)",
-            zIndex: 10,
+            gap: 16,
           }}
         >
-          <div
-            style={{
-              fontFamily: "var(--font-display)",
-              fontSize: "calc(24px * var(--scale, 1))",
-              fontWeight: 600,
-              color: "var(--ink)",
-              letterSpacing: "-0.02em",
-            }}
-          >
-            Exam Portal
+          <div style={{ display: "flex", alignItems: "center" }}>
+            <div>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "calc(22px * var(--scale, 1))",
+                  color: "var(--ink)",
+                  lineHeight: 1.2,
+                }}
+              >
+                Live Exam Portal
+              </div>
+              <div
+                style={{
+                  fontSize: "calc(12px * var(--scale, 1))",
+                  color: "var(--ink-faint)",
+                  marginTop: 2,
+                }}
+              >
+                CBLEL {examDate.getFullYear()}
+              </div>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 12 }}>
-            <button
-              onClick={() => setActiveTab("settings")}
-              className="hide-on-mobile"
-              style={navBtn}
-            >
-              ⚙️
-            </button>
-          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}></div>
         </header>
+      )}
+
+      {/* ── tabs ── */}
+      {!(activeTab === "practice" && isMockExamActive) && (
+        <div
+          className="desktop-tabs"
+          style={{
+            display: "flex",
+            borderBottom: "1px solid var(--cream-border)",
+            padding: "0 24px",
+            overflowX: "auto",
+          }}
+        >
+          {(["dashboard", "practice"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                switchTab(tab);
+              }}
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "calc(13px * var(--scale, 1))",
+                padding: "10px 14px",
+                background: "none",
+                border: "none",
+                whiteSpace: "nowrap",
+                borderBottom:
+                  activeTab === tab
+                    ? "2px solid var(--ink)"
+                    : "2px solid transparent",
+                color: activeTab === tab ? "var(--ink)" : "var(--ink-faint)",
+                cursor: "pointer",
+                fontWeight: activeTab === tab ? 500 : 400,
+                transition: "color 0.15s",
+                textTransform: "capitalize",
+              }}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
       )}
 
       {/* ── main ── */}
       <main
+        key={activeTab}
+        className="fade-in"
         style={{
           flex: 1,
+          minHeight: 0 /* crucial for nested flex scrolling */,
           overflowY: "auto",
-          paddingBottom: "env(safe-area-inset-bottom)",
-          background: "var(--cream)",
-          position: "relative",
-          minHeight: 0,
+          padding:
+            activeTab === "dashboard" || activeTab === "practice"
+              ? 0
+              : "20px 24px",
+          display: "block",
+          flexDirection: "column",
         }}
       >
-        {activeTab === "dashboard" && <Dashboard />}
-
-        {activeTab === "practice" && (
-          <MockExam
-            onActiveChange={setIsMockExamActive}
-            hideOnboarding={true}
+        {activeTab === "dashboard" && (
+          <Dashboard
+            userName={userName}
+            startDateStr={startDateStr}
+            subjects={subjects}
+            milestones={milestones}
+            cycleLength={cycleLength}
+            studyDays={studyDays}
+            onNavigateToPractice={() => switchTab("practice")}
           />
         )}
-
-        {activeTab === "settings" && (
-          <SettingsPage
-            updateAvailable={false}
-            latestRelease={null}
-            onOpenUpdateModal={() => {}}
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            simpleFont={simpleFont}
-            setSimpleFont={setSimpleFont}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            enableStreak={false}
-            setEnableStreak={() => {}}
-            enablePomodoro={false}
-            setEnablePomodoro={() => {}}
-          />
-        )}
+        {activeTab === "practice" && <MockExam isRestDay={restDay} />}
       </main>
-
-      {!isMockExamActive && (
-        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
-      )}
     </div>
   );
 }

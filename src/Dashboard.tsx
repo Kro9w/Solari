@@ -1,151 +1,245 @@
 import { useState, useEffect } from "react";
-import { supabase } from "./utils/supabase";
+import { supabase } from "./lib/supabase";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "./contexts/AuthContext";
+import { DEFAULT_SUBJECTS } from "./App";
 
-type ExamResult = {
-  id: string;
-  exam: {
-    title: string;
-    subjectCode: string;
-  };
-  score: number;
-  total: number;
-  createdAt: string;
-};
+export default function Dashboard({
+  userName,
+  subjects,
+}: {
+  userName: string | null;
+  startDateStr: string | null;
+  subjects: typeof DEFAULT_SUBJECTS;
+  milestones: any[];
+  cycleLength: number;
+  studyDays: number[];
+  onNavigateToPractice: () => void;
+}) {
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
-export default function Dashboard() {
-  const [results, setResults] = useState<ExamResult[]>([]);
+  const [exams, setExams] = useState<any[]>([]);
+  const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchResults() {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
+    async function fetchData() {
+      if (!user) return;
 
-        const { data, error } = await supabase
-          .from("ExamResult")
-          .select("id, score, total, createdAt, exam:Exam(title, subjectCode)")
-          .eq("userId", user.id)
-          .order("createdAt", { ascending: false });
+      const [examsData, resultsData] = await Promise.all([
+        supabase
+          .from("exams")
+          .select("*")
+          .order("accessible_at", { ascending: false }),
+        supabase
+          .from("exam_results")
+          .select("*, exam:exams(title, subject_code)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false }),
+      ]);
 
-        if (error) throw error;
-        setResults(data as any);
-      } catch (err) {
-        console.error("Failed to fetch results:", err);
-      } finally {
-        setLoading(false);
-      }
+      setExams(examsData.data || []);
+      setResults(resultsData.data || []);
+      setLoading(false);
     }
-    fetchResults();
-  }, []);
 
-  if (loading) {
-    return (
-      <div style={{ padding: 24, color: "var(--ink-muted)" }}>
-        Loading results...
-      </div>
-    );
-  }
+    fetchData();
+  }, [user]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/login");
+  };
+
+  if (loading)
+    return <div style={{ padding: "24px" }}>Loading dashboard...</div>;
 
   return (
-    <div
-      style={{
-        padding: "20px 24px",
-        display: "flex",
-        flexDirection: "column",
-        gap: 24,
-      }}
-    >
-      <div>
-        <div
-          style={{
-            fontSize: "calc(20px * var(--scale, 1))",
-            fontWeight: 600,
-            color: "var(--ink)",
-            marginBottom: 16,
-          }}
-        >
-          Past Live Sessions
-        </div>
-
-        {results.length === 0 ? (
-          <div
+    <div style={{ padding: "24px", maxWidth: "800px", margin: "0 auto" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "32px",
+        }}
+      >
+        <h1 style={{ fontSize: "24px", fontFamily: "var(--font-display)" }}>
+          Welcome, {user?.user_metadata?.full_name || userName || "Student"}
+        </h1>
+        <div>
+          <button
+            onClick={() => navigate("/admin")}
             style={{
-              padding: 24,
+              marginRight: "12px",
+              padding: "8px 16px",
               background: "var(--cream-dark)",
-              borderRadius: "var(--radius)",
-              textAlign: "center",
-              color: "var(--ink-muted)",
+              border: "1px solid var(--cream-border)",
+              borderRadius: "4px",
+              cursor: "pointer",
             }}
           >
-            No exam results found yet.
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {results.map((r) => {
-              const pct = (r.score / r.total) * 100;
-              const passed = pct >= 75;
+            Admin Portal
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "8px 16px",
+              background: "var(--red-bg)",
+              color: "var(--red)",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
+        </div>
+      </div>
 
-              return (
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}
+      >
+        {/* Available Exams */}
+        <div>
+          <h2
+            style={{
+              fontSize: "18px",
+              marginBottom: "16px",
+              color: "var(--ink)",
+            }}
+          >
+            Available Live Exams
+          </h2>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            {exams.length === 0 ? (
+              <div style={{ color: "var(--ink-muted)" }}>
+                No live exams scheduled.
+              </div>
+            ) : (
+              exams.map((exam) => {
+                const isAccessible = new Date() >= new Date(exam.accessible_at);
+                const hasTaken = results.some((r) => r.exam_id === exam.id);
+
+                return (
+                  <div
+                    key={exam.id}
+                    style={{
+                      background: "white",
+                      padding: "16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--cream-border)",
+                    }}
+                  >
+                    <div style={{ fontWeight: 500, marginBottom: "4px" }}>
+                      {exam.title} ({exam.subject_code})
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "var(--ink-muted)",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      Access starts:{" "}
+                      {new Date(exam.accessible_at).toLocaleString()}
+                    </div>
+
+                    {hasTaken ? (
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--green)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        ✓ Exam Completed
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => navigate(`/exam/${exam.id}`)}
+                        disabled={!isAccessible}
+                        style={{
+                          padding: "8px 16px",
+                          background: isAccessible
+                            ? "var(--accent)"
+                            : "var(--cream-dark)",
+                          color: isAccessible ? "white" : "var(--ink-faint)",
+                          border: "none",
+                          borderRadius: "4px",
+                          cursor: isAccessible ? "pointer" : "not-allowed",
+                          width: "100%",
+                        }}
+                      >
+                        {isAccessible ? "Start Exam" : "Not Yet Available"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Previous Results */}
+        <div>
+          <h2
+            style={{
+              fontSize: "18px",
+              marginBottom: "16px",
+              color: "var(--ink)",
+            }}
+          >
+            Your Recent Results
+          </h2>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            {results.length === 0 ? (
+              <div style={{ color: "var(--ink-muted)" }}>
+                You haven't taken any exams yet.
+              </div>
+            ) : (
+              results.map((result) => (
                 <div
-                  key={r.id}
+                  key={result.id}
                   style={{
-                    padding: 16,
-                    background: "var(--cream)",
+                    background: "white",
+                    padding: "16px",
+                    borderRadius: "8px",
                     border: "1px solid var(--cream-border)",
-                    borderRadius: "var(--radius-sm)",
                     display: "flex",
-                    alignItems: "center",
                     justifyContent: "space-between",
+                    alignItems: "center",
                   }}
                 >
                   <div>
-                    <div
-                      style={{
-                        fontSize: "calc(15px * var(--scale, 1))",
-                        fontWeight: 500,
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {r.exam.title}
+                    <div style={{ fontWeight: 500, marginBottom: "4px" }}>
+                      {result.exam?.title || "Unknown Exam"}
                     </div>
                     <div
-                      style={{
-                        fontSize: "calc(13px * var(--scale, 1))",
-                        color: "var(--ink-muted)",
-                        marginTop: 4,
-                      }}
+                      style={{ fontSize: "12px", color: "var(--ink-muted)" }}
                     >
-                      {new Date(r.createdAt).toLocaleDateString()} •{" "}
-                      {r.exam.subjectCode}
+                      {new Date(result.created_at).toLocaleDateString()}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div
-                      style={{
-                        fontSize: "calc(16px * var(--scale, 1))",
-                        fontWeight: 600,
-                        color: passed ? "var(--green)" : "var(--red)",
-                      }}
-                    >
-                      {pct.toFixed(1)}%
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "calc(12px * var(--scale, 1))",
-                        color: "var(--ink-muted)",
-                      }}
-                    >
-                      {r.score} / {r.total}
-                    </div>
+                  <div
+                    style={{
+                      fontSize: "24px",
+                      fontWeight: "bold",
+                      color: result.score >= 75 ? "var(--green)" : "var(--red)",
+                    }}
+                  >
+                    {result.score}%
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

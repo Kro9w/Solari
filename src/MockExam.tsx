@@ -1,511 +1,369 @@
-import React, { useState, useEffect } from "react";
-import { supabase } from "./utils/supabase";
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "./lib/supabase";
+import { useAuth } from "./contexts/AuthContext";
+import { useNavigate, useParams } from "react-router-dom";
 
-type Option = { letter: string; text: string; correct: boolean };
-type Question = {
+export type Option = { letter: string; text: string; correct: boolean };
+export type Question = {
   number: number;
   stem: string;
   options: Option[];
+  explanation?: string;
 };
 
-type SupabaseExam = {
-  id: string;
-  title: string;
-  subjectCode: string;
-  duration: number;
-  rawText: string;
-  accessibleAt: string;
-};
+// ── item parser
+export function parseExamMetadata(
+  raw: string,
+): { code: string; durationSeconds?: number } | null {
+  const firstLine =
+    raw
+      .split("\n")
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) || "";
 
-// Parser expecting strict ABCD format and * for the correct answer.
-function parseQuestions(text: string): Question[] {
-  const lines = text.split(/\r?\n/);
+  const match = firstLine.match(/^([A-Z]{2,6}_[A-Z0-9]+)(?:_(\d{1,3}))?$/i);
+  if (!match) return null;
+
+  const code = match[1].toUpperCase();
+  let durationSeconds: number | undefined = undefined;
+
+  if (match[2]) {
+    const minutes = parseInt(match[2], 10);
+    const validMinutes = Math.min(minutes, 150);
+    durationSeconds = validMinutes * 60;
+  }
+
+  return { code, durationSeconds };
+}
+
+export function parseQuestions(raw: string): Question[] {
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   const questions: Question[] = [];
-  let currentQ: Partial<Question> | null = null;
-  let qCounter = 1;
+  let current: (Partial<Question> & { options: Option[] }) | null = null;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
+  const questionReNew = /^Q\.\s+(.+)$/i;
+  const optionReNew = /^(\*?)O\.\s+(.+)$/i;
+  const explanationRe = /^Y:\s+(.+)$/i;
+  const examCodeRe = /^[A-Z]{2,6}_[A-Z0-9]+(_\d{1,3})?$/i;
 
-    // Detect a question stem (e.g., "1. What is...", "Q. What is...", or just text if we don't have a current question and it doesn't look like an option)
-    if (line.match(/^(\d+\.|Q\.)\s/)) {
-      if (
-        currentQ &&
-        currentQ.stem &&
-        currentQ.options &&
-        currentQ.options.length > 0
-      ) {
-        questions.push(currentQ as Question);
-      }
-      currentQ = {
-        number: qCounter++,
-        stem: line.replace(/^(\d+\.|Q\.)\s*/, ""),
-        options: [],
-      };
-    } else if (line.match(/^(\*?[A-D]\.)\s/)) {
-      if (currentQ) {
-        const isCorrect = line.startsWith("*");
-        const letter = line.replace(/^\*?/, "").charAt(0);
-        const optText = line.replace(/^\*?[A-D]\.\s*/, "");
-        if (!currentQ.options) currentQ.options = [];
-        currentQ.options.push({ letter, text: optText, correct: isCorrect });
-      }
-    } else {
-      // Append to stem if we are building a question and haven't hit options yet
-      if (currentQ && (!currentQ.options || currentQ.options.length === 0)) {
-        currentQ.stem += "\n" + line;
+  let questionCounter = 1;
+
+  for (const line of lines) {
+    if (examCodeRe.test(line)) continue;
+
+    const qMatchNew = line.match(questionReNew);
+    const oMatchNew = line.match(optionReNew);
+    const yMatch = line.match(explanationRe);
+
+    if (qMatchNew) {
+      if (current && current.stem && current.options.length > 0)
+        questions.push(current as Question);
+
+      const stemText = qMatchNew[1];
+      current = { number: questionCounter++, stem: stemText, options: [] };
+    } else if (oMatchNew && current) {
+      const isCorrect = oMatchNew[1] === "*";
+      const text = oMatchNew[2].trim();
+      const letters = ["A", "B", "C", "D"];
+      const letter = letters[current.options.length] || "?";
+
+      current.options.push({
+        letter,
+        text,
+        correct: isCorrect,
+      });
+    } else if (yMatch && current) {
+      current.explanation = yMatch[1].trim();
+    } else if (
+      current &&
+      !qMatchNew &&
+      !oMatchNew &&
+      !yMatch &&
+      line.length > 0
+    ) {
+      if (current.explanation) {
+        current.explanation += " " + line;
+      } else {
+        current.stem += " " + line;
       }
     }
   }
-  if (
-    currentQ &&
-    currentQ.stem &&
-    currentQ.options &&
-    currentQ.options.length > 0
-  ) {
-    questions.push(currentQ as Question);
-  }
-
-  // Shuffle questions array but leave options in ABCD order
-  for (let i = questions.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [questions[i], questions[j]] = [questions[j], questions[i]];
-  }
-
+  if (current && current.stem && current.options.length > 0)
+    questions.push(current as Question);
   return questions;
 }
 
-export default function MockExam({
-  onActiveChange,
-  hideOnboarding,
-}: {
-  onActiveChange: (active: boolean) => void;
-  hideOnboarding?: boolean;
-}) {
-  const [exams, setExams] = useState<SupabaseExam[]>([]);
-  const [loading, setLoading] = useState(true);
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
-  // Active exam state
-  const [activeExam, setActiveExam] = useState<SupabaseExam | null>(null);
+function formatTime(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  }
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
+  const { examId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const [examCode, setExamCode] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Record<number, string>>({}); // original question number -> chosen letter
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState<number>(0); // in seconds
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [current, setCurrent] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [phase, setPhase] = useState<"load" | "exam" | "review">("load");
+  const [examDuration, setExamDuration] = useState(3600);
+  const [elapsed, setElapsed] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const [scorePercent, setScorePercent] = useState(0);
 
   useEffect(() => {
-    async function fetchExams() {
-      const { data, error } = await supabase
-        .from("Exam")
-        .select("*")
-        .order("accessibleAt", { ascending: true });
-      if (data) setExams(data);
-      setLoading(false);
-    }
-    fetchExams();
-  }, []);
+    async function loadExam() {
+      if (!examId) return;
+      try {
+        const { data, error } = await supabase
+          .from("exams")
+          .select("*")
+          .eq("id", examId)
+          .single();
 
-  // Timer logic
-  useEffect(() => {
-    if (!activeExam || hasSubmitted) return;
-    const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
+        if (error) throw error;
+
+        const now = new Date();
+        const accessTime = new Date(data.accessible_at);
+        if (now < accessTime) {
+          throw new Error("This exam is not yet accessible.");
         }
-        return prev - 1;
+
+        const metadata = parseExamMetadata(data.file_content);
+        const parsed = parseQuestions(data.file_content);
+
+        // Shuffle questions but KEEP options exactly as A, B, C, D
+        const shuffledQuestions = shuffleArray(parsed).map((q, idx) => ({
+          ...q,
+          number: idx + 1,
+        }));
+
+        setExamCode(data.subject_code);
+        setQuestions(shuffledQuestions);
+        setExamDuration(
+          (data.duration_minutes || metadata?.durationSeconds || 60) * 60,
+        );
+        setPhase("exam");
+        startTimer();
+      } catch (err: any) {
+        setError(err.message || "Failed to load exam.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadExam();
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [examId]);
+
+  function startTimer() {
+    setElapsed(0);
+    timerRef.current = setInterval(() => {
+      setElapsed((e) => {
+        if (e + 1 >= examDuration) {
+          clearInterval(timerRef.current!);
+          finishExam(examDuration);
+          return examDuration;
+        }
+        return e + 1;
       });
     }, 1000);
-    return () => clearInterval(interval);
-  }, [activeExam, hasSubmitted]);
+  }
 
-  // Handle timeout submission safely using the latest answers state
-  useEffect(() => {
-    if (activeExam && !hasSubmitted && timeLeft === 0) {
-      handleSubmit();
-    }
-  }, [timeLeft, activeExam, hasSubmitted]);
+  function choose(letter: string) {
+    setAnswers((prev) => ({ ...prev, [current]: letter }));
+  }
 
-  const startExam = (exam: SupabaseExam) => {
-    const parsed = parseQuestions(exam.rawText);
-    if (parsed.length === 0) {
-      alert("No valid questions found in this exam file.");
-      return;
-    }
-    setQuestions(parsed);
-    setActiveExam(exam);
-    setTimeLeft(exam.duration * 60);
-    setAnswers({});
-    setCurrentIndex(0);
-    setHasSubmitted(false);
-    onActiveChange(true);
-  };
+  async function finishExam(timeTaken: number) {
+    if (timerRef.current) clearInterval(timerRef.current);
 
-  const handleOptionSelect = (qNumber: number, letter: string) => {
-    setAnswers((prev) => ({ ...prev, [qNumber]: letter }));
-  };
+    const correctCount = questions.filter((q, i) => {
+      const chosen = answers[i];
+      return chosen && q.options.find((o) => o.letter === chosen)?.correct;
+    }).length;
 
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-
-    let score = 0;
-    questions.forEach((q) => {
-      const chosenLetter = answers[q.number];
-      const correctOpt = q.options.find((o) => o.correct);
-      if (chosenLetter && correctOpt && chosenLetter === correctOpt.letter) {
-        score++;
-      }
-    });
+    const score = Math.round((correctCount / questions.length) * 100);
+    setScorePercent(score);
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("ExamResult").insert({
-          userId: user.id,
-          examId: activeExam!.id,
-          score,
-          total: questions.length,
-          answers,
-        });
-      }
+      await supabase.from("exam_results").insert({
+        user_id: user?.id,
+        exam_id: examId,
+        score,
+        correct_count: correctCount,
+        total_count: questions.length,
+        answers: answers,
+        time_taken: timeTaken,
+      });
     } catch (err) {
       console.error("Failed to save results:", err);
     }
 
-    setHasSubmitted(true);
-    setIsSubmitting(false);
-    onActiveChange(false);
+    setPhase("review");
+  }
 
-    alert(`Exam completed! You scored ${score} out of ${questions.length}.`);
+  if (loading) return <div style={{ padding: "24px" }}>Loading exam...</div>;
+  if (error)
+    return <div style={{ padding: "24px", color: "red" }}>{error}</div>;
 
-    // reset to list
-    setActiveExam(null);
-  };
-
-  if (loading)
-    return (
-      <div style={{ padding: 24, color: "var(--ink-muted)" }}>
-        Loading available exams...
-      </div>
-    );
-
-  if (activeExam && !hasSubmitted) {
-    const currentQ = questions[currentIndex];
-    const hrs = Math.floor(timeLeft / 3600);
-    const mins = Math.floor((timeLeft % 3600) / 60);
-    const secs = timeLeft % 60;
-    const timeString =
-      hrs > 0
-        ? `${hrs}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-        : `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  if (phase === "exam" && questions.length > 0) {
+    const q = questions[current];
+    const isLast = current === questions.length - 1;
+    const remaining = examDuration - elapsed;
 
     return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          height: "100vh",
-          background: "var(--cream)",
-        }}
-      >
-        {/* Exam Header */}
+      <div style={{ padding: "24px", maxWidth: "600px", margin: "0 auto" }}>
         <div
           style={{
-            padding: "16px 20px",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
-            borderBottom: "1px solid var(--cream-border)",
-            background: "var(--cream)",
-            flexShrink: 0,
-            paddingTop: "max(16px, env(safe-area-inset-top))",
+            marginBottom: "16px",
           }}
         >
-          <div
-            style={{
-              fontSize: "14px",
-              fontWeight: 500,
-              color: "var(--ink-muted)",
-            }}
-          >
-            Question {currentIndex + 1} of {questions.length}
+          <div>
+            {examCode} - Q {current + 1} of {questions.length}
           </div>
-          <div
-            style={{
-              fontSize: "16px",
-              fontWeight: 600,
-              color: timeLeft < 300 ? "var(--red)" : "var(--ink)",
-            }}
-          >
-            {timeString}
+          <div style={{ color: remaining <= 300 ? "red" : "black" }}>
+            Time: {formatTime(remaining)}
           </div>
         </div>
 
-        {/* Scrollable Question Body */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 20px" }}>
-          <div
-            style={{
-              fontSize: "18px",
-              fontWeight: 500,
-              color: "var(--ink)",
-              marginBottom: "32px",
-              whiteSpace: "pre-wrap",
-              lineHeight: 1.6,
-            }}
+        <div
+          style={{
+            background: "var(--cream)",
+            padding: "24px",
+            borderRadius: "8px",
+            marginBottom: "16px",
+            border: "1px solid var(--cream-border)",
+          }}
+        >
+          <p
+            style={{ fontSize: "16px", fontWeight: 500, marginBottom: "16px" }}
           >
-            {currentQ.stem}
-          </div>
-
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-          >
-            {currentQ.options.map((opt) => {
-              const isSelected = answers[currentQ.number] === opt.letter;
-              return (
-                <button
-                  key={opt.letter}
-                  onClick={() =>
-                    handleOptionSelect(currentQ.number, opt.letter)
-                  }
-                  style={{
-                    padding: "16px",
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "12px",
-                    background: isSelected
+            {q.stem}
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            {q.options.map((opt) => (
+              <button
+                key={opt.letter}
+                onClick={() => choose(opt.letter)}
+                style={{
+                  textAlign: "left",
+                  padding: "12px",
+                  background:
+                    answers[current] === opt.letter
                       ? "var(--accent-bg)"
-                      : "var(--cream-dark)",
-                    border: `1px solid ${isSelected ? "var(--accent)" : "var(--cream-border)"}`,
-                    borderRadius: "var(--radius)",
-                    textAlign: "left",
-                    cursor: "pointer",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 24,
-                      height: 24,
-                      flexShrink: 0,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: isSelected ? "var(--accent)" : "var(--cream)",
-                      color: isSelected ? "white" : "var(--ink-muted)",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      border: `1px solid ${isSelected ? "var(--accent)" : "var(--cream-border)"}`,
-                    }}
-                  >
-                    {opt.letter}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "15px",
-                      color: isSelected ? "var(--accent-dark)" : "var(--ink)",
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    {opt.text}
-                  </div>
-                </button>
-              );
-            })}
+                      : "white",
+                  border: `1px solid ${answers[current] === opt.letter ? "var(--accent)" : "var(--cream-border)"}`,
+                  borderRadius: "4px",
+                  cursor: "pointer",
+                }}
+              >
+                <strong>{opt.letter}.</strong> {opt.text}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Exam Navigation Footer */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderTop: "1px solid var(--cream-border)",
-            display: "flex",
-            justifyContent: "space-between",
-            background: "var(--cream)",
-            paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
           <button
-            onClick={() => setCurrentIndex((p) => Math.max(0, p - 1))}
-            disabled={currentIndex === 0}
+            disabled={current === 0}
+            onClick={() => setCurrent((c) => c - 1)}
             style={{
-              padding: "12px 24px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--cream-border)",
-              background: "var(--cream-dark)",
-              color: "var(--ink)",
-              fontWeight: 500,
-              opacity: currentIndex === 0 ? 0.5 : 1,
+              padding: "8px 16px",
+              cursor: current === 0 ? "not-allowed" : "pointer",
             }}
           >
             Previous
           </button>
 
-          {currentIndex === questions.length - 1 ? (
-            <button
-              onClick={() => {
-                if (
-                  window.confirm("Are you sure you want to submit your exam?")
-                ) {
-                  handleSubmit();
-                }
-              }}
-              disabled={isSubmitting}
-              style={{
-                padding: "12px 24px",
-                borderRadius: "var(--radius-sm)",
-                border: "none",
-                background: "var(--accent)",
-                color: "white",
-                fontWeight: 600,
-                opacity: isSubmitting ? 0.5 : 1,
-              }}
-            >
-              {isSubmitting ? "Submitting..." : "Submit Exam"}
-            </button>
-          ) : (
-            <button
-              onClick={() =>
-                setCurrentIndex((p) => Math.min(questions.length - 1, p + 1))
-              }
-              style={{
-                padding: "12px 24px",
-                borderRadius: "var(--radius-sm)",
-                border: "none",
-                background: "var(--accent)",
-                color: "white",
-                fontWeight: 500,
-              }}
-            >
-              Next
-            </button>
-          )}
+          <button
+            onClick={() =>
+              isLast ? finishExam(elapsed) : setCurrent((c) => c + 1)
+            }
+            style={{
+              padding: "8px 16px",
+              background: isLast ? "var(--accent)" : "var(--cream-dark)",
+              color: isLast ? "white" : "black",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+            }}
+          >
+            {isLast ? "Submit Exam" : "Next"}
+          </button>
         </div>
       </div>
     );
   }
 
-  // Exam List
-  return (
-    <div style={{ padding: "20px 24px" }}>
-      <h2
+  if (phase === "review") {
+    return (
+      <div
         style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "24px",
-          marginBottom: "24px",
+          padding: "24px",
+          maxWidth: "600px",
+          margin: "0 auto",
+          textAlign: "center",
         }}
       >
-        Upcoming Live Sessions
-      </h2>
-
-      {exams.length === 0 ? (
+        <h2 style={{ fontSize: "24px", marginBottom: "16px" }}>
+          Exam Submitted!
+        </h2>
         <div
           style={{
-            padding: 24,
-            background: "var(--cream-dark)",
-            borderRadius: "var(--radius)",
-            textAlign: "center",
-            color: "var(--ink-muted)",
+            fontSize: "48px",
+            fontWeight: "bold",
+            color: scorePercent >= 75 ? "var(--green)" : "var(--red)",
+            marginBottom: "24px",
           }}
         >
-          No exams scheduled.
+          {scorePercent}%
         </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {exams.map((exam) => {
-            const isAccessible = new Date() >= new Date(exam.accessibleAt);
-            const dateStr = new Date(exam.accessibleAt).toLocaleString();
+        <p>Your results have been securely logged.</p>
+        <button
+          onClick={() => navigate("/")}
+          style={{
+            marginTop: "24px",
+            padding: "12px 24px",
+            background: "var(--accent)",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
 
-            return (
-              <div
-                key={exam.id}
-                style={{
-                  padding: 20,
-                  background: "var(--cream-dark)",
-                  border: "1px solid var(--cream-border)",
-                  borderRadius: "var(--radius)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: 12,
-                  }}
-                >
-                  <div>
-                    <div
-                      style={{
-                        fontSize: "18px",
-                        fontWeight: 600,
-                        color: "var(--ink)",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {exam.title}
-                    </div>
-                    <div
-                      style={{ fontSize: "14px", color: "var(--ink-muted)" }}
-                    >
-                      Subject Code: {exam.subjectCode}
-                    </div>
-                    <div
-                      style={{ fontSize: "14px", color: "var(--ink-muted)" }}
-                    >
-                      Duration: {exam.duration} mins
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: 20,
-                    paddingTop: 16,
-                    borderTop: "1px solid var(--cream-border)",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "13px",
-                      color: isAccessible ? "var(--green)" : "var(--ink-muted)",
-                      fontWeight: 500,
-                    }}
-                  >
-                    {isAccessible ? "Available Now" : `Opens at ${dateStr}`}
-                  </div>
-                  <button
-                    disabled={!isAccessible}
-                    onClick={() => startExam(exam)}
-                    style={{
-                      padding: "8px 16px",
-                      background: isAccessible
-                        ? "var(--accent)"
-                        : "var(--cream-border)",
-                      color: isAccessible ? "white" : "var(--ink-muted)",
-                      border: "none",
-                      borderRadius: "var(--radius-sm)",
-                      fontWeight: 500,
-                      cursor: isAccessible ? "pointer" : "not-allowed",
-                    }}
-                  >
-                    Start Session
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+  return null;
 }
