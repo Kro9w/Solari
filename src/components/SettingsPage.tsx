@@ -1,7 +1,5 @@
 import React, { useState } from "react";
 import packageJson from "../../package.json";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
 
 export const SettingsPage: React.FC<{
   updateAvailable: boolean;
@@ -347,32 +345,16 @@ export const SettingsPage: React.FC<{
               const jsonString = JSON.stringify(data, null, 2);
               const defaultFilename = `solari-data-${new Date().toISOString().split("T")[0]}.json`;
 
-              // Check if running inside Tauri
-              // @ts-ignore
-              if (window.__TAURI_INTERNALS__) {
-                try {
-                  const filePath = await save({
-                    defaultPath: defaultFilename,
-                    filters: [{ name: "JSON", extensions: ["json"] }],
-                  });
-                  if (filePath) {
-                    await writeTextFile(filePath, jsonString);
-                  }
-                } catch (e) {
-                  console.error("Failed to save via Tauri dialog:", e);
-                }
-              } else {
-                // Fallback for standard browser
-                const blob = new Blob([jsonString], {
-                  type: "application/json",
-                });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = defaultFilename;
-                a.click();
-                URL.revokeObjectURL(url);
-              }
+              // Standard browser download
+              const blob = new Blob([jsonString], {
+                type: "application/json",
+              });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = defaultFilename;
+              a.click();
+              URL.revokeObjectURL(url);
             }}
             style={{
               flex: 1,

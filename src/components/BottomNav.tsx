@@ -1,61 +1,15 @@
-import React, { useState, useEffect, useRef } from "react";
-import { List, BookOpen, Layers, Settings, MoreHorizontal } from "lucide-react";
+import React from "react";
+import { List, BookOpen, Settings } from "lucide-react";
 
 interface BottomNavProps {
   activeTab: string;
   setActiveTab: (tab: any) => void;
-  onMoreClick: () => void;
-  studyStreak?: number;
-  enableStreak?: boolean;
 }
-
-const COMPLIMENTS = [
-  "Nice!",
-  "Keep it up!",
-  "You're on fire!",
-  "Amazing!",
-  "Unstoppable!",
-];
 
 export const BottomNav: React.FC<BottomNavProps> = ({
   activeTab,
   setActiveTab,
-  onMoreClick,
-  studyStreak = 0,
-  enableStreak = true,
 }) => {
-  const prevStreak = useRef(studyStreak);
-  const [streakAnim, setStreakAnim] = useState<
-    "subtle" | "noticeable" | "shake" | null
-  >(null);
-  const [tooltip, setTooltip] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!enableStreak) {
-      setTooltip(null);
-      setStreakAnim(null);
-      return;
-    }
-
-    if (studyStreak > prevStreak.current) {
-      if (studyStreak > 0 && studyStreak % 10 === 0) {
-        setStreakAnim("noticeable");
-        setTooltip(COMPLIMENTS[Math.floor(Math.random() * COMPLIMENTS.length)]);
-        setTimeout(() => {
-          setStreakAnim(null);
-          setTooltip(null);
-        }, 2500);
-      } else {
-        setStreakAnim("subtle");
-        setTimeout(() => setStreakAnim(null), 600);
-      }
-    } else if (studyStreak === 0 && prevStreak.current >= 10) {
-      setStreakAnim("shake");
-      setTimeout(() => setStreakAnim(null), 400);
-    }
-    prevStreak.current = studyStreak;
-  }, [studyStreak, enableStreak]);
-
   return (
     <div className="bottom-nav">
       <button
@@ -73,33 +27,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       </button>
 
       <button
-        className={`nav-item study-btn ${activeTab === "study" ? "active" : ""}`}
-        onClick={() => setActiveTab("study")}
-        style={{ position: "relative" }}
-      >
-        {tooltip && activeTab === "study" && (
-          <div className="streak-tooltip fade-in">{tooltip}</div>
-        )}
-        <div
-          className={`study-circle ${streakAnim ? `anim-${streakAnim}` : ""}`}
-        >
-          {activeTab === "study" && enableStreak ? (
-            <span className="streak-number">{studyStreak}</span>
-          ) : (
-            <Layers size={20} color="white" />
-          )}
-        </div>
-      </button>
-
-      <button
         className={`nav-item ${activeTab === "settings" ? "active" : ""}`}
         onClick={() => setActiveTab("settings")}
       >
         <Settings size={20} />
-      </button>
-
-      <button className={`nav-item`} onClick={onMoreClick}>
-        <MoreHorizontal size={20} />
       </button>
     </div>
   );
