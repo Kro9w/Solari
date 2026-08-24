@@ -18,3 +18,4 @@ public/
 /src-tauri
 src/utils/p2pConstants.ts
 src/P2pAdmin.tsx
+src/scripts

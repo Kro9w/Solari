@@ -16,7 +16,34 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    const normalizedSurname = lastName.trim().toLowerCase();
+
+    // 1. Check if the surname is allowed
+    const { data: allowedData, error: allowedError } = await supabase
+      .from("allowed_surnames")
+      .select("*")
+      .eq("surname", normalizedSurname)
+      .single();
+
+    if (allowedError) {
+      if (allowedError.code === "PGRST116") {
+        setError("Your surname is not on the allowed list.");
+      } else {
+        setError("Error validating surname. Please try again.");
+      }
+      setLoading(false);
+      return;
+    }
+
+    // 2. Check if the surname is already claimed
+    if (allowedData.is_claimed) {
+      setError("This surname has already been registered.");
+      setLoading(false);
+      return;
+    }
+
+    // 3. Proceed with signup
+    const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -27,10 +54,16 @@ export default function Signup() {
       },
     });
 
-    if (error) {
-      setError(error.message);
+    if (signUpError) {
+      setError(signUpError.message);
       setLoading(false);
     } else {
+      // 4. Mark surname as claimed
+      await supabase
+        .from("allowed_surnames")
+        .update({ is_claimed: true })
+        .eq("id", allowedData.id);
+
       navigate("/");
     }
   };
