@@ -301,21 +301,53 @@ export default function AdminDashboard() {
     });
   };
 
+  const calculateExamSchedule = (examsArray: any[], baseTimeIso: string) => {
+    const schedule: { id: string; accessible_at: string }[] = [];
+
+    let baseTime = new Date(baseTimeIso);
+    let startHour = baseTime.getHours();
+    let startMinute = baseTime.getMinutes();
+
+    let currentDayBase = new Date(baseTime); // Start of the current 8-hour daily block
+    let currentTime = new Date(baseTime).getTime();
+
+    for (let i = 0; i < examsArray.length; i++) {
+      const exam = examsArray[i];
+      const durationMs = (exam.duration_minutes || 150) * 60000;
+
+      // If adding this exam exceeds 8 hours from current day's base time, move to next day
+      if (
+        currentTime + durationMs >
+        currentDayBase.getTime() + 8 * 60 * 60 * 1000
+      ) {
+        // Move to next day
+        currentDayBase.setDate(currentDayBase.getDate() + 1);
+        currentDayBase.setHours(startHour, startMinute, 0, 0);
+        currentTime = currentDayBase.getTime();
+      }
+
+      schedule.push({
+        id: exam.id,
+        accessible_at: new Date(currentTime).toISOString(),
+      });
+
+      currentTime += durationMs;
+    }
+
+    return schedule;
+  };
+
   const recalculateExamTimes = async (
     examsArray: any[],
     baseTimeIso: string,
   ) => {
-    let currentTime = new Date(baseTimeIso).getTime();
-    for (let i = 0; i < examsArray.length; i++) {
+    const schedule = calculateExamSchedule(examsArray, baseTimeIso);
+    for (let i = 0; i < schedule.length; i++) {
+      const { id, accessible_at } = schedule[i];
       const exam = examsArray[i];
-      const newTime = new Date(currentTime).toISOString();
-      if (exam.accessible_at !== newTime) {
-        await supabase
-          .from("exams")
-          .update({ accessible_at: newTime })
-          .eq("id", exam.id);
+      if (exam.accessible_at !== accessible_at) {
+        await supabase.from("exams").update({ accessible_at }).eq("id", id);
       }
-      currentTime += (exam.duration_minutes || 150) * 60000;
     }
   };
 
@@ -369,17 +401,25 @@ export default function AdminDashboard() {
         throw new Error("Exactly 100 questions required.");
 
       const currentExams = selectedSet.exams || [];
-      const baseTime = new Date(selectedSet.accessible_at).getTime();
-      const calculatedAccessibleAt = new Date(
-        baseTime + currentExams.length * 150 * 60000,
+
+      // Simulate adding the new exam to the end to find its scheduled time
+      const dummyExamForCalculation = {
+        id: "dummy",
+        duration_minutes: 150,
+      };
+
+      const schedule = calculateExamSchedule(
+        [...currentExams, dummyExamForCalculation],
+        selectedSet.accessible_at,
       );
+      const newExamSchedule = schedule[schedule.length - 1];
 
       const { error } = await supabase.from("exams").insert({
         exam_set_id: selectedSet.id,
         title: examTitle,
         subject_code: subjectCode,
         file_content: text,
-        accessible_at: calculatedAccessibleAt.toISOString(),
+        accessible_at: newExamSchedule.accessible_at,
         duration_minutes: 150,
       });
       if (error) throw error;

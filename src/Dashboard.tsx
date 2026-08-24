@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { DEFAULT_SUBJECTS } from "./App";
+import { parseQuestions } from "./MockExam";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -12,6 +13,9 @@ export default function Dashboard() {
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatsSetId, setSelectedStatsSetId] = useState<string>("");
+  const [selectedResultForModal, setSelectedResultForModal] = useState<
+    any | null
+  >(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -25,7 +29,9 @@ export default function Dashboard() {
           .order("created_at", { ascending: false }),
         supabase
           .from("exam_results")
-          .select("*, exam:exams(title, subject_code, exam_set_id)")
+          .select(
+            "*, exam:exams(title, subject_code, exam_set_id, file_content)",
+          )
           .eq("user_id", user.id)
           .order("created_at", { ascending: false }),
       ]);
@@ -247,6 +253,7 @@ export default function Dashboard() {
                                 fontSize: "12px",
                                 color: "var(--green)",
                                 fontWeight: 500,
+                                marginTop: "auto",
                               }}
                             >
                               ✓ Completed
@@ -271,13 +278,14 @@ export default function Dashboard() {
                                 fontSize: "12px",
                                 width: "100%",
                                 transition: "background 0.2s ease",
+                                marginTop: "auto",
                               }}
                             >
                               {isTimeWindowOpen
                                 ? "Start Exam"
                                 : now > endTime
                                   ? "Closed"
-                                  : "Not Yet Available"}
+                                  : `Opens: ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
                             </button>
                           )}
                         </div>
@@ -424,7 +432,12 @@ export default function Dashboard() {
 
             {/* GWA and Focus Area */}
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                marginTop: "16px",
+              }}
             >
               <div>
                 <div
@@ -507,6 +520,119 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Recent Results Summary */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                marginTop: "8px",
+              }}
+            >
+              <h4
+                style={{
+                  margin: 0,
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  color: "var(--ink)",
+                }}
+              >
+                Recent Results Summary
+              </h4>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                }}
+              >
+                {targetSetResults.map((result) => {
+                  const isPass = result.score >= 50; // Pass standard per subject is usually 50%
+                  const timeFormatted = result.time_taken
+                    ? `${Math.floor(result.time_taken / 60)}m ${result.time_taken % 60}s`
+                    : "--";
+                  return (
+                    <div
+                      key={result.id}
+                      onClick={() => setSelectedResultForModal(result)}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "16px",
+                        background: "var(--cream)",
+                        border: "1px solid var(--cream-border)",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        transition: "background 0.2s ease",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.background = "var(--cream-dark)")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.background = "var(--cream)")
+                      }
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontWeight: 500,
+                            fontSize: "14px",
+                            color: "var(--ink)",
+                          }}
+                        >
+                          {result.exam?.title || "Exam"} (
+                          {result.exam?.subject_code || "Code"})
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--ink-muted)",
+                          }}
+                        >
+                          Taken:{" "}
+                          {new Date(result.created_at).toLocaleDateString()} •
+                          Time: {timeFormatted}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-end",
+                          gap: "4px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "18px",
+                            fontWeight: 600,
+                            color: isPass ? "var(--green)" : "var(--red)",
+                          }}
+                        >
+                          {result.score}%
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "var(--ink-muted)",
+                          }}
+                        >
+                          {result.correct_count} / {result.total_count}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </>
         ) : (
           <div
@@ -521,6 +647,227 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {selectedResultForModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: "24px",
+          }}
+        >
+          <div
+            style={{
+              background: "var(--cream)",
+              borderRadius: "12px",
+              border: "1px solid var(--cream-border)",
+              maxWidth: "600px",
+              width: "100%",
+              maxHeight: "85vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "20px 24px",
+                borderBottom: "1px solid var(--cream-border)",
+              }}
+            >
+              <div>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "20px",
+                    fontFamily: "var(--font-display)",
+                    color: "var(--ink)",
+                  }}
+                >
+                  Exam Summary
+                </h3>
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "var(--ink-muted)",
+                    marginTop: "4px",
+                  }}
+                >
+                  {selectedResultForModal.exam?.title} (
+                  {selectedResultForModal.exam?.subject_code})
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedResultForModal(null)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "24px",
+                  cursor: "pointer",
+                  color: "var(--ink-muted)",
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "24px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+              }}
+            >
+              {(() => {
+                const examContent = selectedResultForModal.exam?.file_content;
+                if (!examContent)
+                  return (
+                    <div style={{ color: "var(--ink-muted)" }}>
+                      Exam content not available.
+                    </div>
+                  );
+
+                const questions = parseQuestions(examContent);
+                const answers = selectedResultForModal.answers || {};
+
+                return questions.map((q: any) => {
+                  const userAnswer = answers[q.originalIndex];
+                  const correctOption = q.options.find((o: any) => o.correct);
+                  const isCorrectlyAnswered =
+                    userAnswer === correctOption?.letter;
+
+                  return (
+                    <div
+                      key={q.number}
+                      style={{
+                        background: "var(--cream-dark)",
+                        padding: "16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--cream-border)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--ink-muted)",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Question {q.number}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "15px",
+                          color: "var(--ink)",
+                          marginBottom: "12px",
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {q.stem}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        {q.options.map((opt: any) => {
+                          const isUserChoice = userAnswer === opt.letter;
+                          const isCorrectChoice =
+                            correctOption?.letter === opt.letter;
+
+                          let bg = "var(--cream)";
+                          let border = "1px solid var(--cream-border)";
+                          if (isCorrectChoice) {
+                            bg = "var(--green-bg)";
+                            border = "1px solid var(--green)";
+                          } else if (isUserChoice && !isCorrectChoice) {
+                            bg = "var(--red-bg)";
+                            border = "1px solid var(--red)";
+                          }
+
+                          return (
+                            <div
+                              key={opt.letter}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                                padding: "8px 12px",
+                                background: bg,
+                                border: border,
+                                borderRadius: "6px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: "24px",
+                                  height: "24px",
+                                  borderRadius: "50%",
+                                  border: `1px solid ${isCorrectChoice ? "var(--green)" : isUserChoice ? "var(--red)" : "var(--ink-muted)"}`,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: "12px",
+                                  color: isCorrectChoice
+                                    ? "var(--green)"
+                                    : isUserChoice
+                                      ? "var(--red)"
+                                      : "var(--ink-muted)",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {opt.letter}
+                              </div>
+                              <div
+                                style={{
+                                  fontSize: "14px",
+                                  color: "var(--ink)",
+                                }}
+                              >
+                                {opt.text}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {!userAnswer && (
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            fontSize: "13px",
+                            color: "var(--ink-muted)",
+                            fontStyle: "italic",
+                          }}
+                        >
+                          You skipped this question.
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
