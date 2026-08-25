@@ -134,6 +134,12 @@ export default function App() {
   const [isMockExamActive, setIsMockExamActive] = useState(false);
 
   const [milestones, setMilestones] = useState<MilestoneData[]>(loadMilestones);
+  const [clockNow, setClockNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const examMs = milestones.find((m) => m.id === "exam")!;
   const examDate = new Date(examMs.dateStr);
@@ -155,7 +161,10 @@ export default function App() {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        background: "var(--cream)",
+        background:
+          "radial-gradient(circle at 90% -8%, rgba(196,168,130,0.16), transparent 42%), " +
+          "radial-gradient(circle at -8% 105%, rgba(160,82,45,0.09), transparent 40%), " +
+          "var(--cream)",
         color: "var(--ink)",
         transition: "background 0.2s, color 0.2s",
       }}
@@ -163,7 +172,7 @@ export default function App() {
       {/* ── header ── */}
       <header
         style={{
-          padding: "14px 24px",
+          padding: "16px 28px",
           borderBottom: "1px solid var(--cream-border)",
           display: "flex",
           alignItems: "center",
@@ -171,7 +180,7 @@ export default function App() {
           gap: 16,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <img
             src={icon}
             alt=""
@@ -187,91 +196,73 @@ export default function App() {
             <div
               style={{
                 fontFamily: "var(--font-display)",
-                fontSize: "calc(22px * var(--scale, 1))",
+                fontSize: "calc(21px * var(--scale, 1))",
                 color: "var(--ink)",
                 lineHeight: 1.2,
               }}
             >
-              SolariWEB Exam Portal
-            </div>
-            <div
-              style={{
-                fontSize: "calc(12px * var(--scale, 1))",
-                color: "var(--ink-faint)",
-                marginTop: 2,
-                letterSpacing: "0.04em",
-                textTransform: "uppercase",
-              }}
-            >
-              CBLEL {examDate.getFullYear()}
+              SolariWEB
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {isAdmin && (
             <button
               onClick={() => navigate("/admin")}
               style={{
-                padding: "6px 12px",
-                background: "var(--cream-dark)",
-                color: "var(--ink)",
+                padding: "7px 14px",
+                background: "transparent",
+                color: "var(--ink-muted)",
                 border: "1px solid var(--cream-border)",
                 borderRadius: "6px",
                 cursor: "pointer",
                 fontWeight: 500,
-                fontSize: "13px",
+                fontSize: "12px",
+                letterSpacing: "0.03em",
                 transition: "all 0.2s ease",
               }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = "var(--accent)";
+                e.currentTarget.style.color = "var(--accent)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = "var(--cream-border)";
+                e.currentTarget.style.color = "var(--ink-muted)";
+              }}
             >
-              Admin Dashboard
+              Admin
             </button>
           )}
           <button
             onClick={handleLogout}
+            aria-label="Log out"
             style={{
-              padding: "6px 12px",
-              background: "var(--red-bg)",
-              color: "var(--red)",
+              width: 32,
+              height: 32,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "transparent",
+              color: "var(--ink-faint)",
               border: "1px solid transparent",
               borderRadius: "6px",
               cursor: "pointer",
-              fontWeight: 500,
-              fontSize: "13px",
+              fontSize: "14px",
               transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--red)";
+              e.currentTarget.style.background = "var(--red-bg)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--ink-faint)";
+              e.currentTarget.style.background = "transparent";
             }}
           >
             ⏻
           </button>
         </div>
       </header>
-
-      {/* ── tabs ── */}
-      <div
-        className="desktop-tabs"
-        style={{
-          display: "flex",
-          borderBottom: "1px solid var(--cream-border)",
-          padding: "0 24px",
-          overflowX: "auto",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--font-body)",
-            fontSize: "calc(13px * var(--scale, 1))",
-            padding: "10px 14px",
-            background: "none",
-            border: "none",
-            whiteSpace: "nowrap",
-            borderBottom: "2px solid var(--ink)",
-            color: "var(--ink)",
-            fontWeight: 500,
-            textTransform: "capitalize",
-          }}
-        >
-          dashboard
-        </div>
-      </div>
 
       {/* ── main ── */}
       <main

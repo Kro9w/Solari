@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
-import { DEFAULT_SUBJECTS } from "./App";
+import { DEFAULT_SUBJECTS, getDaysUntil } from "./App";
 import { parseQuestions } from "./MockExam";
+
+const EXAM_DATE = new Date("2026-09-03");
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -16,6 +18,12 @@ export default function Dashboard() {
   const [selectedResultForModal, setSelectedResultForModal] = useState<
     any | null
   >(null);
+  const [clockNow, setClockNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setClockNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
@@ -65,8 +73,6 @@ export default function Dashboard() {
   const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(",") || [];
   const isAdmin = user?.email && adminEmails.includes(user.email);
 
-  // Group exams by sets for rendering
-
   // Calculate weaknesses / GWA from the SELECTED exam set results
   let targetSetResults: any[] = [];
   let totalGWA: number | null = null;
@@ -99,560 +105,396 @@ export default function Dashboard() {
     }
   }
 
+  const daysToExam = Math.max(0, getDaysUntil(EXAM_DATE));
+
+  // Single source of truth for the chart — computed once so the bars,
+  // labels, and scores can never drift out of sync with each other.
+  const subjectScores = DEFAULT_SUBJECTS.map((sub) => {
+    const res = targetSetResults.find((r) =>
+      r.exam?.subject_code?.startsWith(sub.short),
+    );
+    return { short: sub.short, score: res ? res.score : null };
+  });
+
+  let focusTier: "danger" | "watch" | "good" | "excellent" = "watch";
+  let focusMessage = "";
+  if (lowestSubject) {
+    const s = lowestSubject.score;
+    if (s < 50) {
+      focusTier = "danger";
+      focusMessage = `Warning: ${lowestSubject.short} is at ${s}% — below the passing mark. Prioritize this subject before moving on.`;
+    } else if (s < 75) {
+      focusTier = "watch";
+      focusMessage = `${lowestSubject.short} is your lowest at ${s}%, just short of the 75% target. A few more focused passes here would help.`;
+    } else if (s < 90) {
+      focusTier = "good";
+      focusMessage = `Your lowest score is in ${lowestSubject.short} at ${s}% — already passing. Sharpen it further when you have room.`;
+    } else {
+      focusTier = "excellent";
+      focusMessage = `Even your lowest score, ${lowestSubject.short} at ${s}%, is strong. Nothing urgent here — keep it fresh with light review.`;
+    }
+  }
+
   return (
-    <div
-      style={{
-        padding: "24px",
-        maxWidth: "800px",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        gap: "32px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          borderBottom: "1px solid var(--cream-border)",
-          paddingBottom: "18px",
-        }}
-      >
+    <div className="dash-shell">
+      {/* ── masthead ── */}
+      <div className="dash-header">
         <div>
-          <div
-            style={{
-              fontSize: "12px",
-              letterSpacing: "0.12em",
-              textTransform: "uppercase",
-              color: "var(--accent)",
-              fontWeight: 600,
-              marginBottom: "6px",
-            }}
-          >
-            Dashboard
+          <div className="dash-eyebrow">CBLEL Dashboard</div>
+          <h1 className="dash-heading">Welcome, {displayName}</h1>
+          <div className="live-clock" style={{ marginTop: 8 }}>
+            <span className="live-clock-dot" />
+            {clockNow.toLocaleDateString(undefined, {
+              weekday: "short",
+              month: "short",
+              day: "numeric",
+            })}
+            <span className="live-clock-sep">·</span>
+            <span className="live-clock-time">
+              {clockNow.toLocaleTimeString(undefined, {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+              })}
+            </span>
           </div>
-          <h1
-            style={{
-              fontSize: "32px",
-              fontFamily: "var(--font-display)",
-              color: "var(--ink)",
-              margin: 0,
-              lineHeight: 1.15,
-            }}
-          >
-            Welcome, {displayName}
-          </h1>
         </div>
       </div>
 
-      {/* Available Exams (Sets) */}
-      <div>
-        <h2
-          style={{
-            fontSize: "12px",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            fontWeight: 600,
-            marginBottom: "16px",
-            color: "var(--ink-muted)",
-          }}
-        >
-          Available Live Exams
-        </h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          {examSets.length === 0 ? (
-            <div style={{ color: "var(--ink-muted)" }}>
-              No live exams scheduled.
-            </div>
-          ) : (
-            examSets.map((set) => {
-              return (
-                <div
-                  key={set.id}
-                  style={{
-                    background: "var(--cream-dark)",
-                    padding: "20px",
-                    borderRadius: "10px",
-                    border: "1px solid var(--cream-border)",
-                    boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "16px",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        fontSize: "17px",
-                        fontFamily: "var(--font-display)",
-                        color: "var(--ink)",
-                      }}
-                    >
-                      {set.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        color: "var(--ink-faint)",
-                      }}
-                    >
+      {/* ── stats row ── */}
+      <div className="dash-stats-row">
+        <div className="dash-stat">
+          <div className="dash-stat-value">{daysToExam}</div>
+          <div className="dash-stat-label">Days to exam</div>
+        </div>
+        <div className="dash-stat">
+          <div className="dash-stat-value">{results.length}</div>
+          <div className="dash-stat-label">Exams completed</div>
+        </div>
+        <div className="dash-stat">
+          <div className="dash-stat-value">{lowestSubject?.short || "—"}</div>
+          <div className="dash-stat-label">Focus area</div>
+        </div>
+      </div>
+
+      {/* ── split layout ── */}
+      <div className="dashboard-split-layout">
+        {/* left: available exams */}
+        <div className="dashboard-split-left">
+          <div className="dash-section-label">Available Live Exams</div>
+          <div className="dash-panel">
+            {examSets.length === 0 ? (
+              <div style={{ color: "var(--ink-muted)", fontSize: "14px" }}>
+                No live exams scheduled.
+              </div>
+            ) : (
+              examSets.map((set) => (
+                <div key={set.id} className="dash-set">
+                  <div className="dash-set-header">
+                    <div className="dash-set-title">{set.title}</div>
+                    <div className="dash-set-meta">
                       Access: {new Date(set.accessible_at).toLocaleString()}
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fill, minmax(200px, 1fr))",
-                      gap: "12px",
-                    }}
-                  >
-                    {set.exams?.map((exam: any) => {
-                      const startTime = new Date(exam.accessible_at).getTime();
-                      const endTime =
-                        startTime + (exam.duration_minutes || 150) * 60000;
-                      const now = new Date().getTime();
+                  {set.exams?.map((exam: any) => {
+                    const startTime = new Date(exam.accessible_at).getTime();
+                    const endTime =
+                      startTime + (exam.duration_minutes || 150) * 60000;
+                    const now = new Date().getTime();
 
-                      const originalTimeWindowOpen =
-                        now >= startTime && now <= endTime;
-                      const isTimeWindowOpen =
-                        originalTimeWindowOpen ||
-                        (now > endTime && exam.is_reopened);
-                      const hasTaken = results.some(
-                        (r) => r.exam_id === exam.id,
-                      );
+                    const originalTimeWindowOpen =
+                      now >= startTime && now <= endTime;
+                    const isTimeWindowOpen =
+                      originalTimeWindowOpen ||
+                      (now > endTime && exam.is_reopened);
+                    const hasTaken = results.some((r) => r.exam_id === exam.id);
 
-                      return (
+                    return (
+                      <div key={exam.id} className="dash-exam-row">
+                        <div>
+                          <div className="dash-exam-title">{exam.title}</div>
+                          <div className="dash-exam-code">
+                            {exam.subject_code}
+                          </div>
+                        </div>
+
+                        {hasTaken ? (
+                          <div className="dash-exam-status">✓ Completed</div>
+                        ) : (
+                          <button
+                            className="dash-exam-btn"
+                            onClick={() => navigate(`/exam/${exam.id}`)}
+                            disabled={!isTimeWindowOpen}
+                          >
+                            {originalTimeWindowOpen
+                              ? "Start Exam"
+                              : exam.is_reopened
+                                ? "Start Exam (Late)"
+                                : now > endTime
+                                  ? "Closed"
+                                  : `Opens ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* right: performance statistics */}
+        <div className="dashboard-split-right">
+          <div className="dash-section-label">Performance Statistics</div>
+          <div className="dash-panel">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "20px",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "18px",
+                  color: "var(--ink)",
+                }}
+              >
+                By exam set
+              </div>
+              <select
+                className="dash-select"
+                value={selectedStatsSetId}
+                onChange={(e) => setSelectedStatsSetId(e.target.value)}
+              >
+                {examSets.map((set) => (
+                  <option key={set.id} value={set.id}>
+                    {set.title}
+                  </option>
+                ))}
+                {examSets.length === 0 && (
+                  <option value="">No Exam Sets</option>
+                )}
+              </select>
+            </div>
+
+            {targetSetResults.length > 0 ? (
+              <>
+                {/* weaknesses bar chart */}
+                <div className="dash-chart">
+                  <div className="dash-chart-visual">
+                    <div className="dash-chart-grid">
+                      {[25, 50, 75, 100].map((pct) => (
                         <div
-                          key={exam.id}
+                          key={pct}
+                          className={`dash-chart-gridline ${pct === 75 ? "pass" : ""}`}
+                          style={{ bottom: `${pct}%` }}
+                        >
+                          {pct === 75 && (
+                            <span className="dash-chart-gridline-label">
+                              Pass · 75%
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="dash-chart-bars">
+                      {subjectScores.map(({ short, score }) => (
+                        <div key={short} className="dash-bar-col">
+                          {score !== null && (
+                            <div
+                              className={`dash-bar ${
+                                score < 50
+                                  ? "dash-bar-danger"
+                                  : score < 75
+                                    ? "dash-bar-watch"
+                                    : "dash-bar-good"
+                              }`}
+                              style={{ height: `${score}%` }}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="dash-chart-labels">
+                    {subjectScores.map(({ short, score }) => (
+                      <div key={short} className="dash-bar-col">
+                        <div
+                          className="dash-bar-label"
                           style={{
-                            padding: "12px",
-                            background: "var(--cream)",
-                            border: "1px solid var(--cream-border)",
-                            borderRadius: "6px",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "8px",
+                            color:
+                              score !== null
+                                ? "var(--ink)"
+                                : "var(--ink-faint)",
                           }}
                         >
-                          <div style={{ fontWeight: 500, fontSize: "14px" }}>
-                            {exam.title} ({exam.subject_code})
-                          </div>
+                          {short}
+                        </div>
+                        <div className="dash-bar-score">
+                          {score !== null ? `${score}%` : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                          {hasTaken ? (
+                {/* GWA + focus area */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "16px",
+                    marginTop: "22px",
+                  }}
+                >
+                  <div>
+                    <div className="dash-gwa-row">
+                      <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                        Estimated GWA
+                      </div>
+                      <div
+                        style={{
+                          fontFamily: "var(--font-display)",
+                          fontSize: "17px",
+                          color:
+                            (totalGWA || 0) >= 75
+                              ? "var(--green)"
+                              : "var(--red)",
+                        }}
+                      >
+                        {totalGWA}%
+                      </div>
+                    </div>
+                    <div className="dash-gwa-track">
+                      <div
+                        className="dash-gwa-fill"
+                        style={{
+                          width: `${totalGWA || 0}%`,
+                          background:
+                            (totalGWA || 0) >= 75
+                              ? "var(--green)"
+                              : "var(--accent)",
+                        }}
+                      />
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--ink-muted)",
+                        marginTop: "6px",
+                      }}
+                    >
+                      Target: 75% to pass
+                    </div>
+                  </div>
+
+                  <div className={`dash-focus-callout ${focusTier}`}>
+                    {focusMessage}
+                  </div>
+                </div>
+
+                {/* recent results */}
+                <div style={{ marginTop: "28px" }}>
+                  <div
+                    style={{
+                      fontSize: "12px",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--ink-muted)",
+                      fontWeight: 600,
+                      marginBottom: "10px",
+                    }}
+                  >
+                    Recent Results
+                  </div>
+                  <div>
+                    {targetSetResults.map((result) => {
+                      const isPass = result.score >= 50;
+                      const timeFormatted = result.time_taken
+                        ? `${Math.floor(result.time_taken / 60)}m ${result.time_taken % 60}s`
+                        : "--";
+                      return (
+                        <div
+                          key={result.id}
+                          className="dash-result-row"
+                          onClick={() => setSelectedResultForModal(result)}
+                        >
+                          <div>
                             <div
                               style={{
-                                fontSize: "12px",
-                                color: "var(--green)",
                                 fontWeight: 500,
-                                marginTop: "auto",
+                                fontSize: "13px",
+                                color: "var(--ink)",
                               }}
                             >
-                              ✓ Completed
+                              {result.exam?.title || "Exam"}
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => navigate(`/exam/${exam.id}`)}
-                              disabled={!isTimeWindowOpen}
+                            <div
                               style={{
-                                padding: "6px 12px",
-                                background: isTimeWindowOpen
-                                  ? "var(--accent)"
-                                  : "var(--cream-dark)",
-                                color: isTimeWindowOpen
-                                  ? "white"
-                                  : "var(--ink-faint)",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: isTimeWindowOpen
-                                  ? "pointer"
-                                  : "not-allowed",
-                                fontSize: "12px",
-                                width: "100%",
-                                transition: "background 0.2s ease",
-                                marginTop: "auto",
+                                fontSize: "11px",
+                                color: "var(--ink-muted)",
+                                marginTop: "2px",
                               }}
                             >
-                              {originalTimeWindowOpen
-                                ? "Start Exam"
-                                : exam.is_reopened
-                                  ? "Start Exam (Late)"
-                                  : now > endTime
-                                    ? "Closed"
-                                    : `Opens: ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
-                            </button>
-                          )}
+                              {new Date(result.created_at).toLocaleDateString()}{" "}
+                              · {timeFormatted}
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              alignItems: "flex-end",
+                              gap: "2px",
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: "15px",
+                                fontWeight: 600,
+                                color: isPass ? "var(--green)" : "var(--red)",
+                              }}
+                            >
+                              {result.score}%
+                            </div>
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--ink-muted)",
+                              }}
+                            >
+                              {result.correct_count} / {result.total_count}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Weaknesses / GWA */}
-      <div
-        style={{
-          background: "var(--cream-dark)",
-          border: "1px solid var(--cream-border)",
-          borderRadius: "10px",
-          padding: "24px",
-          display: "flex",
-          flexDirection: "column",
-          gap: "24px",
-        }}
-      >
-        {/* Header with Dropdown */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <h3
-            style={{
-              margin: 0,
-              fontSize: "20px",
-              fontWeight: 500,
-              fontFamily: "var(--font-display)",
-              color: "var(--ink)",
-            }}
-          >
-            Performance Statistics
-          </h3>
-          <select
-            value={selectedStatsSetId}
-            onChange={(e) => setSelectedStatsSetId(e.target.value)}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "4px",
-              border: "1px solid var(--cream-border)",
-              background: "var(--cream)",
-              fontSize: "14px",
-              color: "var(--ink)",
-              cursor: "pointer",
-            }}
-          >
-            {examSets.map((set) => (
-              <option key={set.id} value={set.id}>
-                {set.title}
-              </option>
-            ))}
-            {examSets.length === 0 && <option value="">No Exam Sets</option>}
-          </select>
-        </div>
-
-        {targetSetResults.length > 0 ? (
-          <>
-            {/* Weaknesses Bar Chart Simulation */}
-            <div>
+              </>
+            ) : (
               <div
                 style={{
-                  display: "flex",
-                  gap: "12px",
-                  justifyContent: "space-between",
-                  alignItems: "flex-end",
-                  height: "120px",
-                  borderBottom: "1px dashed var(--cream-border)",
-                  paddingBottom: "8px",
+                  color: "var(--ink-muted)",
+                  textAlign: "center",
+                  padding: "20px 0",
+                  fontSize: "14px",
                 }}
               >
-                {DEFAULT_SUBJECTS.map((sub) => {
-                  const res = targetSetResults.find((r) =>
-                    r.exam?.subject_code?.startsWith(sub.short),
-                  );
-                  const score = res ? res.score : null;
-                  return (
-                    <div
-                      key={sub.short}
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        flex: 1,
-                        gap: "8px",
-                      }}
-                    >
-                      {score !== null ? (
-                        <div
-                          style={{
-                            width: "100%",
-                            maxWidth: "60px",
-                            height: `${score}%`,
-                            background: "var(--accent)",
-                            borderRadius: "4px 4px 0 0",
-                            minHeight: "4px",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            color: "var(--ink-faint)",
-                            fontSize: "12px",
-                          }}
-                        >
-                          —
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 500,
-                          color:
-                            score !== null ? "var(--ink)" : "var(--ink-faint)",
-                        }}
-                      >
-                        {sub.short}
-                      </div>
-                      {score !== null && (
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          {score}%
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                No results available for this exam set yet.
               </div>
-            </div>
-
-            {/* GWA and Focus Area */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-                marginTop: "16px",
-              }}
-            >
-              <div>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <div style={{ fontSize: "14px", fontWeight: 500 }}>
-                    Estimated GWA
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "16px",
-                      color:
-                        (totalGWA || 0) >= 75 ? "var(--green)" : "var(--red)",
-                    }}
-                  >
-                    {totalGWA}%
-                  </div>
-                </div>
-                <div
-                  style={{
-                    height: "8px",
-                    background: "var(--cream-dark)",
-                    borderRadius: "4px",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${totalGWA || 0}%`,
-                      background:
-                        (totalGWA || 0) >= 75
-                          ? "var(--green)"
-                          : "var(--accent)",
-                    }}
-                  />
-                </div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--ink-muted)",
-                    marginTop: "4px",
-                  }}
-                >
-                  Target: 75% to pass
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background:
-                    lowestSubject?.score < 50
-                      ? "var(--red-bg)"
-                      : "var(--accent-bg)",
-                  padding: "12px",
-                  borderRadius: "var(--radius-sm)",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    color:
-                      lowestSubject?.score < 50
-                        ? "var(--red)"
-                        : "var(--accent)",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Focus Area
-                </div>
-                <div style={{ fontSize: "13px" }}>
-                  {lowestSubject?.score < 50
-                    ? `Warning: ${lowestSubject.short} is below 50%. You must review this subject to avoid failing.`
-                    : `Your lowest score is in ${lowestSubject?.short} (${lowestSubject?.score}%). Consider dedicating more time here.`}
-                </div>
-              </div>
-            </div>
-
-            {/* Recent Results Summary */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-                marginTop: "8px",
-              }}
-            >
-              <h4
-                style={{
-                  margin: 0,
-                  fontSize: "16px",
-                  fontWeight: 500,
-                  color: "var(--ink)",
-                }}
-              >
-                Recent Results Summary
-              </h4>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "12px",
-                }}
-              >
-                {targetSetResults.map((result) => {
-                  const isPass = result.score >= 50; // Pass standard per subject is usually 50%
-                  const timeFormatted = result.time_taken
-                    ? `${Math.floor(result.time_taken / 60)}m ${result.time_taken % 60}s`
-                    : "--";
-                  return (
-                    <div
-                      key={result.id}
-                      onClick={() => setSelectedResultForModal(result)}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "16px",
-                        background: "var(--cream)",
-                        border: "1px solid var(--cream-border)",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        transition: "background 0.2s ease",
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = "var(--cream-dark)")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "var(--cream)")
-                      }
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "4px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontWeight: 500,
-                            fontSize: "14px",
-                            color: "var(--ink)",
-                          }}
-                        >
-                          {result.exam?.title || "Exam"} (
-                          {result.exam?.subject_code || "Code"})
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          Taken:{" "}
-                          {new Date(result.created_at).toLocaleDateString()} •
-                          Time: {timeFormatted}
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          alignItems: "flex-end",
-                          gap: "4px",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: "18px",
-                            fontWeight: 600,
-                            color: isPass ? "var(--green)" : "var(--red)",
-                          }}
-                        >
-                          {result.score}%
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          {result.correct_count} / {result.total_count}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div
-            style={{
-              color: "var(--ink-muted)",
-              textAlign: "center",
-              padding: "20px 0",
-              fontSize: "14px",
-            }}
-          >
-            No results available for this exam set yet.
+            )}
           </div>
-        )}
+        </div>
       </div>
 
+      {/* ── exam summary modal ── */}
       {selectedResultForModal && (
         <div
           style={{
@@ -661,7 +503,7 @@ export default function Dashboard() {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(28,26,23,0.55)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -672,14 +514,14 @@ export default function Dashboard() {
           <div
             style={{
               background: "var(--cream)",
-              borderRadius: "12px",
+              borderRadius: "10px",
               border: "1px solid var(--cream-border)",
               maxWidth: "600px",
               width: "100%",
               maxHeight: "85vh",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
             }}
           >
             <div
