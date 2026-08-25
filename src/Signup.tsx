@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
+import icon from "../icon.png";
+
+const EXAM_DATE = new Date("2026-09-03");
+const TICKS = Array.from({ length: 24 }, (_, i) => i);
+const EXIT_MS = 260;
 
 export default function Signup() {
   const [email, setEmail] = useState("");
@@ -9,7 +14,20 @@ export default function Signup() {
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
   const navigate = useNavigate();
+
+  const goToLogin = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (leaving) return;
+    setLeaving(true);
+    setTimeout(() => navigate("/login"), EXIT_MS);
+  };
+
+  const daysToExam = useMemo(() => {
+    const diff = Math.ceil((EXAM_DATE.getTime() - Date.now()) / 86400000);
+    return Math.max(0, diff);
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,203 +87,141 @@ export default function Signup() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        height: "100vh",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "var(--cream)",
-      }}
-    >
-      <div
-        style={{
-          width: "100%",
-          maxWidth: "400px",
-          padding: "24px",
-          background: "var(--cream-dark)",
-          borderRadius: "10px",
-          border: "1px solid var(--cream-border)",
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: "var(--font-display)",
-            fontSize: "24px",
-            marginBottom: "16px",
-            color: "var(--ink)",
-          }}
-        >
-          Sign up
-        </h2>
+    <div className={`auth-shell reverse ${leaving ? "leaving" : ""}`}>
+      {/* ── brand panel ── */}
+      <aside className="auth-brand-panel">
+        <div className="auth-kicker">SolariWEB · CBLEL Exam Portal</div>
 
-        {error && (
-          <div
-            style={{
-              padding: "12px",
-              background: "var(--red-bg)",
-              color: "var(--red)",
-              borderRadius: "6px",
-              marginBottom: "16px",
-              fontSize: "14px",
-            }}
-          >
-            {error}
+        <div className="auth-brand-center">
+          <div className="auth-mark-wrap">
+            <div className="auth-mark-glow" />
+            <svg
+              className="auth-mark-ring"
+              viewBox="0 0 200 200"
+              aria-hidden="true"
+            >
+              <g className="auth-ring-group">
+                {TICKS.map((i) => {
+                  const angle = (i * 15 * Math.PI) / 180;
+                  const isMajor = i % 6 === 0;
+                  const rOuter = 96;
+                  const rInner = isMajor ? 78 : 87;
+                  const x1 = 100 + rOuter * Math.sin(angle);
+                  const y1 = 100 - rOuter * Math.cos(angle);
+                  const x2 = 100 + rInner * Math.sin(angle);
+                  const y2 = 100 - rInner * Math.cos(angle);
+                  return (
+                    <line
+                      key={i}
+                      className="auth-tick"
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      stroke={
+                        isMajor
+                          ? "var(--accent-light)"
+                          : "rgba(245,241,234,0.35)"
+                      }
+                      strokeWidth={isMajor ? 2 : 1}
+                      strokeLinecap="round"
+                      style={
+                        {
+                          animationDelay: `${i * 0.03}s`,
+                          "--tick-opacity": isMajor ? 1 : 0.7,
+                        } as React.CSSProperties
+                      }
+                    />
+                  );
+                })}
+              </g>
+            </svg>
+            <img src={icon} alt="SolariWEB" className="auth-mark-icon" />
           </div>
-        )}
 
-        <form
-          onSubmit={handleSignup}
-          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-        >
-          <div style={{ display: "flex", gap: "16px" }}>
-            <div style={{ flex: 1 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "4px",
-                  fontSize: "14px",
-                  color: "var(--ink-muted)",
-                }}
-              >
-                First Name
-              </label>
+          <div className="auth-countdown">
+            <span className="auth-countdown-line" />
+            {daysToExam} {daysToExam === 1 ? "day" : "days"} to the CBLEL exam
+            <span className="auth-countdown-line" />
+          </div>
+
+          <p className="auth-pullquote">Your journey starts here.</p>
+        </div>
+
+        <div className="auth-brand-footer">CBLEL · 2026</div>
+      </aside>
+
+      {/* ── form panel ── */}
+      <div className="auth-form-panel">
+        <div className="auth-form-inner">
+          <div className="auth-mobile-mark">
+            <img src={icon} alt="" />
+            <span>SolariWEB</span>
+          </div>
+
+          <h2 className="auth-heading">Create your account</h2>
+          <p className="auth-subtext">Set up your study plan for the boards.</p>
+
+          {error && <div className="auth-error">{error}</div>}
+
+          <form onSubmit={handleSignup} className="auth-form">
+            <div className="auth-field-row">
+              <div className="auth-field">
+                <label className="auth-field-label">First name</label>
+                <input
+                  className="auth-input"
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="auth-field">
+                <label className="auth-field-label">Last name</label>
+                <input
+                  className="auth-input"
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="auth-field">
+              <label className="auth-field-label">Email</label>
               <input
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
+                className="auth-input"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--cream-border)",
-                  background: "var(--cream)",
-                  color: "var(--ink)",
-                  fontSize: "16px",
-                  boxSizing: "border-box",
-                }}
               />
             </div>
-            <div style={{ flex: 1 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: "4px",
-                  fontSize: "14px",
-                  color: "var(--ink-muted)",
-                }}
-              >
-                Last Name
-              </label>
+            <div className="auth-field">
+              <label className="auth-field-label">Password</label>
               <input
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
+                className="auth-input"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 required
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: "6px",
-                  border: "1px solid var(--cream-border)",
-                  background: "var(--cream)",
-                  color: "var(--ink)",
-                  fontSize: "16px",
-                  boxSizing: "border-box",
-                }}
               />
             </div>
-          </div>
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "4px",
-                fontSize: "14px",
-                color: "var(--ink-muted)",
-              }}
+            <button
+              className="auth-submit-btn"
+              type="submit"
+              disabled={loading}
             >
-              Email
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--cream-border)",
-                background: "var(--cream)",
-                color: "var(--ink)",
-                fontSize: "16px",
-              }}
-            />
-          </div>
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "4px",
-                fontSize: "14px",
-                color: "var(--ink-muted)",
-              }}
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "6px",
-                border: "1px solid var(--cream-border)",
-                background: "var(--cream)",
-                color: "var(--ink)",
-                fontSize: "16px",
-              }}
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              padding: "12px",
-              background: "var(--accent)",
-              color: "var(--cream)",
-              border: "none",
-              borderRadius: "6px",
-              fontWeight: 500,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
-          >
-            {loading ? "Creating account..." : "Sign up"}
-          </button>
-        </form>
+              {loading ? "Creating account…" : "Sign up"}
+            </button>
+          </form>
 
-        <div
-          style={{
-            marginTop: "24px",
-            textAlign: "center",
-            fontSize: "14px",
-            color: "var(--ink-muted)",
-          }}
-        >
-          Already have an account?{" "}
-          <Link
-            to="/login"
-            style={{
-              color: "var(--accent)",
-              textDecoration: "none",
-              fontWeight: 500,
-            }}
-          >
-            Log in
-          </Link>
+          <div className="auth-switch">
+            Already have an account?{" "}
+            <Link to="/login" className="auth-link" onClick={goToLogin}>
+              Log in
+            </Link>
+          </div>
         </div>
       </div>
     </div>

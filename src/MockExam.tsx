@@ -161,6 +161,10 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [confirmText, setConfirmText] = useState("");
   const [showBookmarksModal, setShowBookmarksModal] = useState(false);
 
+  const [syncStatus, setSyncStatus] = useState<
+    "synced" | "syncing" | "offline"
+  >("synced");
+
   useEffect(() => {
     async function loadExam() {
       if (!examId) return;
@@ -179,22 +183,103 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           throw new Error("This exam is not yet accessible.");
         }
 
+        const endTime = new Date(
+          accessTime.getTime() + (data.duration_minutes || 150) * 60000,
+        );
+        if (now > endTime && !data.is_reopened) {
+          throw new Error("This exam is closed.");
+        }
+
         const metadata = parseExamMetadata(data.file_content);
         const parsed = parseQuestions(data.file_content);
 
-        // Shuffle questions but KEEP options exactly as A, B, C, D
-        const shuffledQuestions = shuffleArray(parsed).map((q, idx) => ({
-          ...q,
-          number: idx + 1,
-        }));
+        const standardDurationSeconds =
+          (data.duration_minutes || metadata?.durationSeconds || 60) * 60;
+
+        // If not reopened indefinitely, calculate the remaining real-world seconds until endTime
+        let actualRemainingSeconds = standardDurationSeconds;
+        if (!data.is_reopened) {
+          const secondsUntilEnd = Math.max(
+            0,
+            Math.floor((endTime.getTime() - now.getTime()) / 1000),
+          );
+          actualRemainingSeconds = Math.min(
+            secondsUntilEnd,
+            standardDurationSeconds,
+          );
+        }
+
+        let loadedQuestions: Question[] | null = null;
+        let loadedAnswers: Record<number, string> = {};
+        let loadedBookmarks: number[] = [];
+        let loadedElapsed = 0;
+        let loadedCurrent = 0;
+
+        if (user?.id) {
+          const localKey = `exam_session_${user.id}_${examId}`;
+          const localStr = localStorage.getItem(localKey);
+          let localState: any = null;
+          if (localStr) {
+            try {
+              localState = JSON.parse(localStr);
+            } catch (e) {}
+          }
+
+          const { data: remoteSession } = await supabase
+            .from("exam_sessions")
+            .select("state, updated_at")
+            .eq("user_id", user.id)
+            .eq("exam_id", examId)
+            .single();
+
+          let bestState: any = null;
+
+          if (localState && remoteSession) {
+            const localTime = new Date(localState.updated_at || 0).getTime();
+            const remoteTime = new Date(
+              remoteSession.updated_at || 0,
+            ).getTime();
+            bestState =
+              localTime > remoteTime ? localState : remoteSession.state;
+          } else {
+            bestState =
+              localState || (remoteSession ? remoteSession.state : null);
+          }
+
+          if (
+            bestState &&
+            bestState.questions &&
+            bestState.questions.length > 0
+          ) {
+            loadedQuestions = bestState.questions;
+            loadedAnswers = bestState.answers || {};
+            loadedBookmarks = bestState.bookmarks || [];
+            loadedElapsed = bestState.elapsed || 0;
+            loadedCurrent = bestState.current || 0;
+          }
+        }
+
+        if (!loadedQuestions) {
+          loadedQuestions = shuffleArray(parsed).map((q, idx) => ({
+            ...q,
+            number: idx + 1,
+          }));
+        }
 
         setExamCode(data.subject_code);
-        setQuestions(shuffledQuestions);
-        setExamDuration(
-          (data.duration_minutes || metadata?.durationSeconds || 60) * 60,
-        );
+        setQuestions(loadedQuestions);
+        setAnswers(loadedAnswers);
+        setBookmarks(loadedBookmarks);
+
+        // Final Duration is `elapsed + actualRemainingSeconds`
+        // This ensures `finalDuration - elapsed = actualRemainingSeconds`
+        const calculatedFinalDuration = loadedElapsed + actualRemainingSeconds;
+
+        setElapsed(loadedElapsed);
+        setCurrent(loadedCurrent);
+        setExamDuration(calculatedFinalDuration);
         setPhase("exam");
-        startTimer();
+        startTimer(loadedElapsed, calculatedFinalDuration);
       } catch (err: any) {
         setError(err.message || "Failed to load exam.");
       } finally {
@@ -207,21 +292,81 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [examId]);
+  }, [examId, user]);
 
-  function startTimer() {
-    setElapsed(0);
+  function startTimer(initialElapsed: number, duration: number) {
+    setElapsed(initialElapsed);
     timerRef.current = setInterval(() => {
       setElapsed((e) => {
-        if (e + 1 >= examDuration) {
+        const nextElapsed = e + 1;
+        if (nextElapsed >= duration) {
           clearInterval(timerRef.current!);
-          finishExam(examDuration);
-          return examDuration;
+          return duration;
         }
-        return e + 1;
+        return nextElapsed;
       });
     }, 1000);
   }
+
+  // Ref to hold the latest elapsed time so the interaction-based sync gets the latest time without triggering sync every second
+  const latestElapsedRef = useRef(elapsed);
+  useEffect(() => {
+    latestElapsedRef.current = elapsed;
+  }, [elapsed]);
+
+  // Handle auto-submit securely when time runs out without using stale closure
+  useEffect(() => {
+    if (phase === "exam" && elapsed >= examDuration && questions.length > 0) {
+      finishExam(examDuration);
+    }
+  }, [elapsed, examDuration, phase, questions, answers]); // Depend on answers/questions so finishExam gets freshest state
+
+  useEffect(() => {
+    if (phase !== "exam" || questions.length === 0 || !user?.id || !examId)
+      return;
+
+    const saveSession = async () => {
+      setSyncStatus("syncing");
+      const state = {
+        questions,
+        answers,
+        bookmarks,
+        current,
+        elapsed: latestElapsedRef.current,
+        updated_at: new Date().toISOString(),
+      };
+
+      const localKey = `exam_session_${user.id}_${examId}`;
+      localStorage.setItem(localKey, JSON.stringify(state));
+
+      const userName = user?.user_metadata?.first_name
+        ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
+        : "Student";
+
+      try {
+        const { error } = await supabase.from("exam_sessions").upsert(
+          {
+            user_id: user.id,
+            exam_id: examId,
+            user_name: userName,
+            state,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "user_id,exam_id" },
+        );
+
+        if (error) throw error;
+        setSyncStatus("synced");
+      } catch (err) {
+        // Silent fail for network issues, local is saved
+        setSyncStatus("offline");
+      }
+    };
+
+    // Only save when user interacts (answers, bookmarks, current page changes), NOT when elapsed changes
+    const timeout = setTimeout(saveSession, 500);
+    return () => clearTimeout(timeout);
+  }, [answers, bookmarks, current, phase, questions, user, examId]);
 
   function choose(letter: string) {
     setAnswers((prev) => ({ ...prev, [current]: letter }));
@@ -269,6 +414,16 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         answers: originalIndexedAnswers,
         time_taken: timeTaken,
       });
+
+      if (user?.id && examId) {
+        const localKey = `exam_session_${user.id}_${examId}`;
+        localStorage.removeItem(localKey);
+        await supabase
+          .from("exam_sessions")
+          .delete()
+          .eq("user_id", user.id)
+          .eq("exam_id", examId);
+      }
     } catch (err) {
       console.error("Failed to save results:", err);
     }
@@ -310,16 +465,84 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               marginBottom: "12px",
             }}
           >
-            <div style={{ fontSize: "16px", color: "var(--ink-muted)" }}>
+            <div
+              style={{ fontSize: "16px", color: "var(--ink-muted)", flex: 1 }}
+            >
               <span style={{ color: "var(--ink)", fontWeight: 500 }}>
                 {examCode}
               </span>{" "}
               · Full exam
             </div>
+
+            <div
+              style={{
+                flex: 1,
+                textAlign: "center",
+                fontSize: "12px",
+                fontWeight: 500,
+                color:
+                  syncStatus === "offline" ? "var(--red)" : "var(--ink-faint)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+              }}
+            >
+              {syncStatus === "syncing" && (
+                <>
+                  <span className="exam-nav-text">Syncing...</span>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: "var(--ink-muted)",
+                      display: "inline-block",
+                    }}
+                  ></span>
+                </>
+              )}
+              {syncStatus === "synced" && (
+                <>
+                  <span className="exam-nav-text">Saved</span>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: "var(--green)",
+                      display: "inline-block",
+                    }}
+                  ></span>
+                </>
+              )}
+              {syncStatus === "offline" && (
+                <>
+                  <span
+                    className="exam-nav-text"
+                    style={{ color: "var(--red)" }}
+                  >
+                    Offline (Saved Locally)
+                  </span>
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: "var(--red)",
+                      display: "inline-block",
+                    }}
+                  ></span>
+                </>
+              )}
+            </div>
+
             <div
               style={{
                 fontSize: "16px",
                 fontWeight: 500,
+                flex: 1,
+                textAlign: "right",
                 color:
                   remaining <= 60
                     ? "var(--red)"

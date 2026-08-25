@@ -768,8 +768,34 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* ── Auth (Login / Signup) editorial layout ── */
+.auth-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--cream);
+}
+
+.auth-shell.reverse {
+  flex-direction: row-reverse;
+}
+
 .auth-brand-panel {
   display: none;
+  flex: 1;
+  position: relative;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 48px;
+  overflow: hidden;
+  color: var(--cream);
+  background:
+    radial-gradient(
+      circle at 30% 20%,
+      rgba(196, 168, 130, 0.16),
+      transparent 55%
+    ),
+    linear-gradient(160deg, #241a10 0%, #1c1a17 55%, #2b1c12 100%);
 }
 
 @media (min-width: 900px) {
@@ -778,6 +804,307 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
   .auth-mobile-mark {
     display: none !important;
+  }
+}
+
+.auth-kicker {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(245, 241, 234, 0.55);
+}
+
+.auth-brand-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 26px;
+  max-width: 360px;
+  text-align: center;
+}
+
+.auth-mark-wrap {
+  position: relative;
+  width: 176px;
+  height: 176px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-mark-glow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  margin: -130px 0 0 -130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--sienna) 0%, transparent 68%);
+  filter: blur(6px);
+  opacity: 0.4;
+  animation: breatheGradient 6s ease-in-out infinite;
+  transform-origin: center center;
+}
+
+.auth-mark-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+.auth-ring-group {
+  transform-origin: 100px 100px;
+  animation: solarDrift 220s linear infinite;
+}
+
+.auth-tick {
+  opacity: 0;
+  animation: tickIn 0.5s ease-out forwards;
+}
+
+.auth-mark-icon {
+  position: relative;
+  z-index: 2;
+  width: 84px;
+  height: 84px;
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: markIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.auth-countdown {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-light);
+}
+
+.auth-countdown-line {
+  width: 20px;
+  height: 1px;
+  background: rgba(196, 168, 130, 0.5);
+}
+
+.auth-pullquote {
+  font-family: var(--font-display);
+  font-size: 27px;
+  line-height: 1.3;
+  font-style: italic;
+  color: var(--cream);
+}
+
+.auth-brand-footer {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(245, 241, 234, 0.4);
+}
+
+.auth-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--cream);
+}
+
+.auth-form-inner {
+  width: 100%;
+  max-width: 380px;
+  animation: fadeIn 0.5s ease-out both;
+}
+
+.auth-mobile-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.auth-mobile-mark img {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.auth-mobile-mark span {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.auth-heading {
+  font-family: var(--font-display);
+  font-size: 34px;
+  color: var(--ink);
+  margin-bottom: 6px;
+}
+
+.auth-subtext {
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin-bottom: 32px;
+}
+
+.auth-error {
+  padding: 12px 14px;
+  background: var(--red-bg);
+  color: var(--red);
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.auth-field {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.auth-field-row {
+  display: flex;
+  gap: 16px;
+}
+
+.auth-switch {
+  margin-top: 28px;
+  font-size: 14px;
+  color: var(--ink-muted);
+}
+
+@keyframes tickIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: var(--tick-opacity, 1);
+  }
+}
+
+@keyframes markIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes solarDrift {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-ring-group,
+  .auth-mark-glow,
+  .auth-tick,
+  .auth-mark-icon,
+  .auth-form-inner {
+    animation: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Auth page transition (Login ⇄ Signup) ── */
+/* One element animates itself in and out — no overlay swiping across
+   the screen, so there is nothing to "hand off" between pages and
+   nothing that can look like two separate sweeps. */
+.auth-shell {
+  position: relative;
+  animation: authEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.auth-shell.leaving {
+  animation: authExit 0.26s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.auth-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(196, 168, 130, 0.4),
+    transparent 62%
+  );
+  opacity: 0;
+  animation: authFlash 0.6s ease-out both;
+}
+
+@keyframes authEnter {
+  from {
+    opacity: 0;
+    transform: scale(1.012) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes authExit {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.985) translateY(-6px);
+  }
+}
+
+@keyframes authFlash {
+  0% {
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell,
+  .auth-shell.leaving,
+  .auth-shell::after {
+    animation: none !important;
   }
 }
 

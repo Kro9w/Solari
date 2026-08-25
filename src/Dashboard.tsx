@@ -224,8 +224,11 @@ export default function Dashboard() {
                         startTime + (exam.duration_minutes || 150) * 60000;
                       const now = new Date().getTime();
 
-                      const isTimeWindowOpen =
+                      const originalTimeWindowOpen =
                         now >= startTime && now <= endTime;
+                      const isTimeWindowOpen =
+                        originalTimeWindowOpen ||
+                        (now > endTime && exam.is_reopened);
                       const hasTaken = results.some(
                         (r) => r.exam_id === exam.id,
                       );
@@ -281,11 +284,13 @@ export default function Dashboard() {
                                 marginTop: "auto",
                               }}
                             >
-                              {isTimeWindowOpen
+                              {originalTimeWindowOpen
                                 ? "Start Exam"
-                                : now > endTime
-                                  ? "Closed"
-                                  : `Opens: ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
+                                : exam.is_reopened
+                                  ? "Start Exam (Late)"
+                                  : now > endTime
+                                    ? "Closed"
+                                    : `Opens: ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
                             </button>
                           )}
                         </div>

@@ -4,9 +4,10 @@ import { DEFAULT_SUBJECTS } from "./App";
 import { parseQuestions } from "./MockExam";
 import { useNavigate } from "react-router-dom";
 import icon from "../icon.png";
+import LiveFeedback from "./LiveFeedback";
 
 type Step = "SELECT_OR_CREATE_SET" | "MANAGE_SET";
-type AdminTab = "MANAGE" | "ANALYTICS";
+type AdminTab = "MANAGE" | "ANALYTICS" | "LIVE_FEEDBACK";
 
 // Modal component for deletion confirmations
 const ConfirmModal = ({
@@ -684,6 +685,27 @@ export default function AdminDashboard() {
         >
           Analytics & Item Analysis
         </button>
+        <button
+          onClick={() => setActiveTab("LIVE_FEEDBACK")}
+          style={{
+            padding: "12px 18px",
+            background: "none",
+            border: "none",
+            fontSize: "13px",
+            letterSpacing: "0.03em",
+            fontWeight: activeTab === "LIVE_FEEDBACK" ? 600 : 500,
+            color:
+              activeTab === "LIVE_FEEDBACK" ? "var(--ink)" : "var(--ink-muted)",
+            borderBottom:
+              activeTab === "LIVE_FEEDBACK"
+                ? "2px solid var(--accent)"
+                : "2px solid transparent",
+            cursor: "pointer",
+            transition: "color 0.2s ease",
+          }}
+        >
+          Live Feedback
+        </button>
       </div>
 
       {activeTab === "MANAGE" && (
@@ -1058,6 +1080,72 @@ export default function AdminDashboard() {
                             gap: "12px",
                           }}
                         >
+                          {(() => {
+                            const endTime =
+                              new Date(exam.accessible_at).getTime() +
+                              (exam.duration_minutes || 150) * 60000;
+                            const isClosed = Date.now() > endTime;
+
+                            if (isClosed) {
+                              return (
+                                <button
+                                  onClick={async () => {
+                                    const newStatus = !exam.is_reopened;
+                                    try {
+                                      const { error } = await supabase
+                                        .from("exams")
+                                        .update({ is_reopened: newStatus })
+                                        .eq("id", exam.id);
+
+                                      if (error) throw error;
+
+                                      // Local update for immediate feedback
+                                      const updatedExams =
+                                        selectedSet.exams.map((e: any) =>
+                                          e.id === exam.id
+                                            ? { ...e, is_reopened: newStatus }
+                                            : e,
+                                        );
+                                      setSelectedSet({
+                                        ...selectedSet,
+                                        exams: updatedExams,
+                                      });
+                                    } catch (err) {
+                                      console.error(
+                                        "Failed to toggle reopen status:",
+                                        err,
+                                      );
+                                      alert("Failed to toggle reopen status.");
+                                    }
+                                  }}
+                                  style={{
+                                    fontSize: "12px",
+                                    background: exam.is_reopened
+                                      ? "var(--green-bg)"
+                                      : "var(--cream-dark)",
+                                    color: exam.is_reopened
+                                      ? "var(--green)"
+                                      : "var(--ink-muted)",
+                                    padding: "4px 8px",
+                                    borderRadius: "6px",
+                                    border: `1px solid ${exam.is_reopened ? "var(--green)" : "var(--cream-border)"}`,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                  }}
+                                  title={
+                                    exam.is_reopened
+                                      ? "Close reopened exam"
+                                      : "Indefinitely reopen exam for late takers"
+                                  }
+                                >
+                                  {exam.is_reopened
+                                    ? "Reopened (Indefinite)"
+                                    : "Reopen for Late Takers"}
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
                           <div
                             style={{
                               fontSize: "12px",
@@ -1668,6 +1756,12 @@ export default function AdminDashboard() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {activeTab === "LIVE_FEEDBACK" && (
+        <div className="admin-content-card">
+          <LiveFeedback />
         </div>
       )}
     </div>
