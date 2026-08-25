@@ -160,7 +160,7 @@ export default function Signup() {
           </div>
 
           <h2 className="auth-heading">Create your entry</h2>
-          <p className="auth-subtext">Set up your study plan for the boards.</p>
+          <p className="auth-subtext">Set up your account to get started.</p>
 
           {error && <div className="auth-error">{error}</div>}
 
