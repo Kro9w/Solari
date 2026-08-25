@@ -157,6 +157,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [examDuration, setExamDuration] = useState(3600);
   const [elapsed, setElapsed] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedAtRef = useRef<string | undefined>(undefined);
 
   const [scorePercent, setScorePercent] = useState(0);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
@@ -167,6 +168,8 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     "synced" | "syncing" | "offline"
   >("synced");
   const [isLateTaker, setIsLateTaker] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadExam() {
@@ -189,9 +192,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         const endTime = new Date(
           accessTime.getTime() + (data.duration_minutes || 150) * 60000,
         );
-        if (now > endTime && !data.is_reopened) {
-          throw new Error("This exam is closed.");
-        }
 
         const metadata = parseExamMetadata(data.file_content);
         const parsed = parseQuestions(data.file_content);
@@ -219,6 +219,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         let loadedBookmarks: number[] = [];
         let loadedElapsed = 0;
         let loadedCurrent = 0;
+        let loadedStartedAt: string | undefined = undefined;
 
         if (user?.id) {
           const localKey = `exam_session_${user.id}_${examId}`;
@@ -238,6 +239,82 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             .single();
 
           let bestState: any = null;
+
+          if (now > endTime && !data.is_reopened) {
+            // Auto-submit abandoned sessions for standard exams
+            if (remoteSession && remoteSession.state) {
+              const abandonedState = remoteSession.state;
+              const abandonedQuestions = abandonedState.questions || [];
+              const abandonedAnswers = abandonedState.answers || {};
+              const abandonedElapsed =
+                abandonedState.elapsed || standardDurationSeconds;
+
+              if (abandonedQuestions.length > 0) {
+                const correctCount = abandonedQuestions.filter(
+                  (q: any, i: number) => {
+                    const chosen = abandonedAnswers[i];
+                    return (
+                      chosen &&
+                      q.options.find((o: any) => o.letter === chosen)?.correct
+                    );
+                  },
+                ).length;
+                const score = Math.round(
+                  (correctCount / abandonedQuestions.length) * 100,
+                );
+                const originalIndexedAnswers: Record<number, string> = {};
+                Object.keys(abandonedAnswers).forEach((shuffledIdx) => {
+                  const q = abandonedQuestions[parseInt(shuffledIdx, 10)];
+                  if (q) {
+                    originalIndexedAnswers[q.originalIndex] =
+                      abandonedAnswers[parseInt(shuffledIdx, 10)];
+                  }
+                });
+
+                const userName = user?.user_metadata?.first_name
+                  ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
+                  : "Student";
+
+                const { data: existingResult } = await supabase
+                  .from("exam_results")
+                  .select("id")
+                  .eq("user_id", user?.id)
+                  .eq("exam_id", examId)
+                  .maybeSingle();
+
+                if (existingResult) {
+                  await supabase
+                    .from("exam_results")
+                    .update({
+                      score,
+                      correct_count: correctCount,
+                      answers: originalIndexedAnswers,
+                      time_taken: abandonedElapsed,
+                    })
+                    .eq("id", existingResult.id);
+                } else {
+                  await supabase.from("exam_results").insert({
+                    user_id: user?.id,
+                    user_name: userName,
+                    exam_id: examId,
+                    score,
+                    correct_count: correctCount,
+                    total_count: abandonedQuestions.length,
+                    answers: originalIndexedAnswers,
+                    time_taken: abandonedElapsed,
+                  });
+                }
+
+                await supabase
+                  .from("exam_sessions")
+                  .delete()
+                  .eq("user_id", user.id)
+                  .eq("exam_id", examId);
+                localStorage.removeItem(localKey);
+              }
+            }
+            throw new Error("This exam is closed.");
+          }
 
           if (localState && remoteSession) {
             const localTime = new Date(localState.updated_at || 0).getTime();
@@ -261,6 +338,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             loadedBookmarks = bestState.bookmarks || [];
             loadedElapsed = bestState.elapsed || 0;
             loadedCurrent = bestState.current || 0;
+            loadedStartedAt = bestState.started_at;
           }
         }
 
@@ -276,9 +354,41 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         setAnswers(loadedAnswers);
         setBookmarks(loadedBookmarks);
 
+        if (now > endTime) {
+          // Late taker logic
+          if (!loadedStartedAt) {
+            // First time loading for late taker
+            loadedStartedAt = new Date().toISOString();
+            loadedElapsed = 0; // Initialize elapsed
+          } else {
+            // Returning late taker, calculate elapsed based on started_at
+            const startedAtTime = new Date(loadedStartedAt).getTime();
+            const elapsedTimeSeconds = Math.max(
+              0,
+              Math.floor((now.getTime() - startedAtTime) / 1000),
+            );
+            loadedElapsed = Math.min(
+              elapsedTimeSeconds,
+              standardDurationSeconds,
+            );
+          }
+          actualRemainingSeconds = Math.max(
+            0,
+            standardDurationSeconds - loadedElapsed,
+          );
+        }
+
+        if (!loadedStartedAt) {
+          // For regular takers who haven't saved a started_at yet
+          loadedStartedAt = new Date().toISOString();
+        }
+
         // Final Duration is `elapsed + actualRemainingSeconds`
         // This ensures `finalDuration - elapsed = actualRemainingSeconds`
         const calculatedFinalDuration = loadedElapsed + actualRemainingSeconds;
+
+        // Store started_at in ref so we can save it later
+        startedAtRef.current = loadedStartedAt;
 
         setElapsed(loadedElapsed);
         setCurrent(loadedCurrent);
@@ -301,16 +411,25 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   function startTimer(initialElapsed: number, duration: number) {
     setElapsed(initialElapsed);
+    const startRealTime = Date.now();
+
     timerRef.current = setInterval(() => {
-      setElapsed((e) => {
-        const nextElapsed = e + 1;
-        if (nextElapsed >= duration) {
+      const now = Date.now();
+      const realElapsed =
+        initialElapsed + Math.floor((now - startRealTime) / 1000);
+
+      setElapsed((prev) => {
+        // Only update state if the value has actually changed to prevent unnecessary re-renders
+        if (prev === realElapsed || prev >= duration) {
+          return prev;
+        }
+        if (realElapsed >= duration) {
           clearInterval(timerRef.current!);
           return duration;
         }
-        return nextElapsed;
+        return realElapsed;
       });
-    }, 1000);
+    }, 500); // Check more frequently than 1s to ensure smooth visual updates, but state only changes every 1s
   }
 
   // Ref to hold the latest elapsed time so the interaction-based sync gets the latest time without triggering sync every second
@@ -321,10 +440,15 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   // Handle auto-submit securely when time runs out without using stale closure
   useEffect(() => {
-    if (phase === "exam" && elapsed >= examDuration && questions.length > 0) {
+    if (
+      phase === "exam" &&
+      elapsed >= examDuration &&
+      questions.length > 0 &&
+      !submitError
+    ) {
       finishExam(examDuration);
     }
-  }, [elapsed, examDuration, phase, questions, answers]); // Depend on answers/questions so finishExam gets freshest state
+  }, [elapsed, examDuration, phase, questions, answers, submitError]); // Depend on answers/questions so finishExam gets freshest state
 
   useEffect(() => {
     if (phase !== "exam" || questions.length === 0 || !user?.id || !examId)
@@ -359,6 +483,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         bookmarks,
         current,
         elapsed: latestElapsedRef.current,
+        started_at: startedAtRef.current,
         updated_at: new Date().toISOString(),
       };
 
@@ -407,6 +532,9 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   }
 
   async function finishExam(timeTaken: number) {
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
+
     if (timerRef.current) clearInterval(timerRef.current);
 
     const correctCount = questions.filter((q, i) => {
@@ -430,16 +558,46 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     });
 
     try {
-      await supabase.from("exam_results").insert({
-        user_id: user?.id,
-        user_name: userName,
-        exam_id: examId,
-        score,
-        correct_count: correctCount,
-        total_count: questions.length,
-        answers: originalIndexedAnswers,
-        time_taken: timeTaken,
-      });
+      // First check if an existing result exists to prevent duplicates entirely
+      const { data: existingResult, error: selectError } = await supabase
+        .from("exam_results")
+        .select("id")
+        .eq("user_id", user?.id)
+        .eq("exam_id", examId)
+        .maybeSingle();
+
+      if (selectError) throw selectError;
+
+      if (existingResult) {
+        // Optionally update it if we want to allow overwriting with auto-submit, but standard procedure is once submitted, it's done.
+        // In this context, if it already exists, we should just update it to ensure latest answers are captured.
+        const { error: updateError } = await supabase
+          .from("exam_results")
+          .update({
+            score,
+            correct_count: correctCount,
+            answers: originalIndexedAnswers,
+            time_taken: timeTaken,
+          })
+          .eq("id", existingResult.id);
+
+        if (updateError) throw updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from("exam_results")
+          .insert({
+            user_id: user?.id,
+            user_name: userName,
+            exam_id: examId,
+            score,
+            correct_count: correctCount,
+            total_count: questions.length,
+            answers: originalIndexedAnswers,
+            time_taken: timeTaken,
+          });
+
+        if (insertError) throw insertError;
+      }
 
       if (user?.id && examId) {
         const localKey = `exam_session_${user.id}_${examId}`;
@@ -450,11 +608,17 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           .eq("user_id", user.id)
           .eq("exam_id", examId);
       }
-    } catch (err) {
-      console.error("Failed to save results:", err);
-    }
 
-    setPhase("review");
+      setSubmitError(null);
+      setPhase("review");
+    } catch (err: any) {
+      console.error("Failed to save results:", err);
+      setSubmitError(
+        "Failed to submit exam due to connection issues. Please do not close the window, ensure you have internet access, and click 'Retry Submission'.",
+      );
+    } finally {
+      isSubmittingRef.current = false;
+    }
   }
 
   if (loading) return <Loader />;
@@ -1041,6 +1205,77 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                   }}
                 >
                   Confirm Submission
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Connection Error Submission Modal */}
+        {submitError && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(28,26,23,0.7)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+              padding: "24px",
+            }}
+          >
+            <div
+              style={{
+                background: "var(--cream)",
+                padding: "32px",
+                borderRadius: "12px",
+                maxWidth: "400px",
+                border: "1px solid var(--cream-border)",
+                boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+                textAlign: "center",
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "20px",
+                  marginBottom: "8px",
+                  color: "var(--red)",
+                  fontFamily: "var(--font-display)",
+                }}
+              >
+                Submission Failed
+              </h3>
+              <p style={{ color: "var(--ink-muted)", marginBottom: "24px" }}>
+                {submitError}
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: "12px",
+                  justifyContent: "center",
+                }}
+              >
+                <button
+                  onClick={() => {
+                    setSubmitError(null);
+                    finishExam(elapsed);
+                  }}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "6px",
+                    background: "var(--accent)",
+                    border: "1px solid var(--accent-light)",
+                    color: "var(--cream)",
+                    cursor: "pointer",
+                    fontWeight: 500,
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  Retry Submission
                 </button>
               </div>
             </div>

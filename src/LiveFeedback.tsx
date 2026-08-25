@@ -54,13 +54,21 @@ export default function LiveFeedback() {
   const [selectedMobileSession, setSelectedMobileSession] = useState<
     any | null
   >(null);
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchSessions = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from("exam_sessions")
-        .select("*, exam:exams(title, subject_code)")
+        .select(
+          "*, exam:exams(id, title, subject_code, is_reopened, duration_minutes, accessible_at)",
+        )
         .order("updated_at", { ascending: false });
 
       if (error) throw error;
@@ -94,18 +102,31 @@ export default function LiveFeedback() {
     );
   }
 
-  // Group by exam
+  // Group by exam object properties
   const grouped = sessions.reduce(
     (acc, curr) => {
-      const examName = curr.exam
-        ? `${curr.exam.title} (${curr.exam.subject_code})`
-        : "Unknown Exam";
-      if (!acc[examName]) acc[examName] = [];
-      acc[examName].push(curr);
+      const examId = curr.exam?.id || "unknown";
+      if (!acc[examId]) {
+        acc[examId] = {
+          exam: curr.exam,
+          sessions: [],
+        };
+      }
+      acc[examId].sessions.push(curr);
       return acc;
     },
-    {} as Record<string, any[]>,
+    {} as Record<string, { exam: any; sessions: any[] }>,
   );
+
+  function formatTime(secs: number): string {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = Math.floor(secs % 60);
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
 
   return (
     <div className="feed-shell">
@@ -119,68 +140,157 @@ export default function LiveFeedback() {
         </button>
       </div>
 
-      {Object.entries(grouped).map(([examName, examSessions]) => (
-        <div key={examName} className="dash-panel">
-          <div className="dash-set-title" style={{ marginBottom: "16px" }}>
-            {examName}
-          </div>
-          <div>
-            {(examSessions as any[]).map((s: any) => {
-              const answers = s.state?.answers || {};
-              const answersCount = Object.keys(answers).length;
-              const totalQuestions = s.state?.questions?.length || 100;
-              const userName = s.user_name || "Unknown Student";
+      {Object.values(grouped).map((groupInfo: any) => {
+        const { exam, sessions: examSessions } = groupInfo;
+        const examName = exam
+          ? `${exam.title} (${exam.subject_code})`
+          : "Unknown Exam";
 
-              return (
-                <div key={s.id} className="feed-row">
-                  <div style={{ flex: "0 0 auto" }}>
-                    <div className="feed-name">{userName}</div>
-                    <div className="feed-meta">
-                      {answersCount} / {totalQuestions} answered
-                    </div>
-                  </div>
+        let timeRemainingDisplay = null;
+        if (exam && !exam.is_reopened && exam.accessible_at) {
+          const accessTime = new Date(exam.accessible_at);
+          const endTime = new Date(
+            accessTime.getTime() + (exam.duration_minutes || 150) * 60000,
+          );
+          const remainingSeconds = Math.max(
+            0,
+            Math.floor((endTime.getTime() - now.getTime()) / 1000),
+          );
+          if (remainingSeconds > 0) {
+            timeRemainingDisplay = formatTime(remainingSeconds);
+          } else {
+            timeRemainingDisplay = "Ended";
+          }
+        }
 
-                  {/* Desktop Grid */}
-                  <div
-                    className="hide-on-mobile"
-                    style={{
-                      flex: 1,
-                      display: "flex",
-                      justifyContent: "flex-end",
-                    }}
-                  >
-                    <div className="feed-grid">
-                      {Array.from({ length: totalQuestions }).map((_, i) => {
-                        const hasAnswer = !!answers[i];
-                        return (
-                          <div
-                            key={i}
-                            title={`Q${i + 1}`}
-                            className={`feed-cell${hasAnswer ? " answered" : ""}`}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Mobile Button */}
-                  <div
-                    className="show-on-mobile-flex"
-                    style={{ display: "none" }}
-                  >
-                    <button
-                      className="feed-view-btn"
-                      onClick={() => setSelectedMobileSession(s)}
-                    >
-                      View Grid
-                    </button>
-                  </div>
+        return (
+          <div key={exam?.id || examName} className="dash-panel">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                className="dash-set-title"
+                style={{
+                  margin: 0,
+                  color: exam?.is_reopened ? "var(--red)" : "inherit",
+                }}
+              >
+                {examName} {exam?.is_reopened && "(Reopened)"}
+              </div>
+              {timeRemainingDisplay && (
+                <div
+                  style={{
+                    fontSize: "16px",
+                    fontWeight: "bold",
+                    color: "var(--accent)",
+                  }}
+                >
+                  {timeRemainingDisplay} remaining
                 </div>
-              );
-            })}
+              )}
+            </div>
+            <div>
+              {(examSessions as any[]).map((s: any) => {
+                const answers = s.state?.answers || {};
+                const answersCount = Object.keys(answers).length;
+                const totalQuestions = s.state?.questions?.length || 100;
+                const userName = s.user_name || "Unknown Student";
+
+                let lateTakerInfo = null;
+                if (exam?.is_reopened && s.state?.started_at) {
+                  const startedAtTime = new Date(s.state.started_at);
+                  const standardDurationSeconds =
+                    (exam.duration_minutes || 150) * 60;
+                  const elapsedSeconds = Math.max(
+                    0,
+                    Math.floor(
+                      (now.getTime() - startedAtTime.getTime()) / 1000,
+                    ),
+                  );
+                  const remainingSeconds = Math.max(
+                    0,
+                    standardDurationSeconds - elapsedSeconds,
+                  );
+
+                  lateTakerInfo = (
+                    <div
+                      className="feed-meta"
+                      style={{
+                        marginTop: "4px",
+                        color:
+                          remainingSeconds > 0 ? "var(--accent)" : "var(--red)",
+                      }}
+                    >
+                      Started:{" "}
+                      {startedAtTime.toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}{" "}
+                      •{" "}
+                      {remainingSeconds > 0
+                        ? `${formatTime(remainingSeconds)} remaining`
+                        : "Time's up"}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={s.id} className="feed-row">
+                    <div style={{ flex: "0 0 auto" }}>
+                      <div className="feed-name">{userName}</div>
+                      <div className="feed-meta">
+                        {answersCount} / {totalQuestions} answered
+                      </div>
+                      {lateTakerInfo}
+                    </div>
+
+                    {/* Desktop Grid */}
+                    <div
+                      className="hide-on-mobile"
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <div className="feed-grid">
+                        {Array.from({ length: totalQuestions }).map((_, i) => {
+                          const hasAnswer = !!answers[i];
+                          return (
+                            <div
+                              key={i}
+                              title={`Q${i + 1}`}
+                              className={`feed-cell${hasAnswer ? " answered" : ""}`}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Mobile Button */}
+                    <div
+                      className="show-on-mobile-flex"
+                      style={{ display: "none" }}
+                    >
+                      <button
+                        className="feed-view-btn"
+                        onClick={() => setSelectedMobileSession(s)}
+                      >
+                        View Grid
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
 
       <MobileGridModal
         isOpen={!!selectedMobileSession}
