@@ -626,7 +626,7 @@ export default function AdminDashboard() {
           }}
         >
           <div>
-            <div className="dash-eyebrow">SolariWEB Administration</div>
+            <div className="dash-eyebrow">SINAG Administration</div>
             <h1 className="dash-heading">Admin Dashboard</h1>
           </div>
           <button

@@ -49,7 +49,7 @@ export default function Login() {
     <div className={`auth-shell ${leaving ? "leaving" : ""}`}>
       {/* ── brand panel ── */}
       <aside className="auth-brand-panel">
-        <div className="auth-kicker">SolariWEB · CBLEL Exam Portal</div>
+        <div className="auth-kicker">SINAG · SMRC Exam Portal</div>
 
         <div className="auth-brand-center">
           <div className="auth-mark-wrap">
@@ -95,7 +95,7 @@ export default function Login() {
                 })}
               </g>
             </svg>
-            <img src={icon} alt="SolariWEB" className="auth-mark-icon" />
+            <img src={icon} alt="SINAG" className="auth-mark-icon" />
           </div>
 
           <div className="auth-countdown">
@@ -115,7 +115,7 @@ export default function Login() {
         <div className="auth-form-inner">
           <div className="auth-mobile-mark">
             <img src={icon} alt="" />
-            <span>SolariWEB</span>
+            <span>SINAG</span>
           </div>
 
           <h2 className="auth-heading">Log in</h2>

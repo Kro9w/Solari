@@ -201,7 +201,17 @@ export default function App() {
                 lineHeight: 1.2,
               }}
             >
-              SolariWEB
+              SINAG
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-body)",
+                fontSize: "calc(12px * var(--scale, 1))",
+                color: "var(--ink-muted)",
+                lineHeight: 1.2,
+              }}
+            >
+              SMRC Exam Portal
             </div>
           </div>
         </div>
