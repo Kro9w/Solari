@@ -139,7 +139,7 @@ export default function Dashboard() {
     <div className="dash-shell">
       {/* ── masthead ── */}
       <div className="dash-header">
-        <div>
+        <div style={{ position: "relative", zIndex: 2 }}>
           <div className="dash-eyebrow">CBLEL Dashboard</div>
           <h1 className="dash-heading">Welcome, {displayName}</h1>
           <div className="live-clock" style={{ marginTop: 8 }}>
@@ -158,6 +158,45 @@ export default function Dashboard() {
               })}
             </span>
           </div>
+        </div>
+
+        {/* Decorative background ring similar to auth */}
+        <div className="dash-header-ring-wrap" aria-hidden="true">
+          <svg className="dash-header-ring" viewBox="0 0 200 200">
+            <g className="dash-ring-group">
+              {Array.from({ length: 24 }, (_, i) => i).map((i) => {
+                const angle = (i * 15 * Math.PI) / 180;
+                const isMajor = i % 6 === 0;
+                const rOuter = 96;
+                const rInner = isMajor ? 78 : 87;
+                const x1 = 100 + rOuter * Math.sin(angle);
+                const y1 = 100 - rOuter * Math.cos(angle);
+                const x2 = 100 + rInner * Math.sin(angle);
+                const y2 = 100 - rInner * Math.cos(angle);
+                return (
+                  <line
+                    key={i}
+                    className="dash-tick"
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke={
+                      isMajor ? "var(--accent-light)" : "var(--cream-border)"
+                    }
+                    strokeWidth={isMajor ? 4 : 3}
+                    strokeLinecap="round"
+                    style={
+                      {
+                        animationDelay: `${i * 0.03}s`,
+                        "--tick-opacity": isMajor ? 1 : 0.6,
+                      } as React.CSSProperties
+                    }
+                  />
+                );
+              })}
+            </g>
+          </svg>
         </div>
       </div>
 

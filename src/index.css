@@ -1200,6 +1200,38 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   position: relative;
   padding: 20px 24px 22px 4px;
   border-bottom: 1px solid var(--cream-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  overflow: hidden;
+}
+
+.dash-header-ring-wrap {
+  position: absolute;
+  right: -20px;
+  bottom: -90px;
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  z-index: 1;
+}
+
+.dash-header-ring {
+  width: 100%;
+  height: 100%;
+}
+
+.dash-ring-group {
+  transform-origin: 100px 100px;
+  animation: solarDrift 220s linear infinite;
+}
+
+.dash-tick {
+  opacity: 0;
+  animation: tickIn 0.5s ease-out forwards;
 }
 
 .dash-eyebrow {
