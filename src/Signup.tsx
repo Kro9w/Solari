@@ -159,7 +159,7 @@ export default function Signup() {
             <span>SolariWEB</span>
           </div>
 
-          <h2 className="auth-heading">Create your account</h2>
+          <h2 className="auth-heading">Create your entry</h2>
           <p className="auth-subtext">Set up your study plan for the boards.</p>
 
           {error && <div className="auth-error">{error}</div>}
@@ -167,45 +167,65 @@ export default function Signup() {
           <form onSubmit={handleSignup} className="auth-form">
             <div className="auth-field-row">
               <div className="auth-field">
-                <label className="auth-field-label">First name</label>
-                <input
-                  className="auth-input"
-                  type="text"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                />
+                <label className="auth-field-label">
+                  <span className="marc-tag">100</span> Personal Name
+                </label>
+                <div className="marc-input-group">
+                  <div className="marc-indicator">0#</div>
+                  <div className="marc-subfield">$a</div>
+                  <input
+                    className="auth-input marc-input"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                    placeholder="Name"
+                  />
+                </div>
               </div>
               <div className="auth-field">
-                <label className="auth-field-label">Last name</label>
+                <label className="auth-field-label">&nbsp;</label>
                 <input
                   className="auth-input"
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
                   required
+                  placeholder="Last Name"
                 />
               </div>
             </div>
             <div className="auth-field">
-              <label className="auth-field-label">Email</label>
-              <input
-                className="auth-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <label className="auth-field-label">
+                <span className="marc-tag">856</span> Email
+              </label>
+              <div className="marc-input-group">
+                <div className="marc-indicator">0#</div>
+                <div className="marc-subfield">$u</div>
+                <input
+                  className="auth-input marc-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <div className="auth-field">
-              <label className="auth-field-label">Password</label>
-              <input
-                className="auth-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <label className="auth-field-label">
+                <span className="marc-tag">856</span> Password
+              </label>
+              <div className="marc-input-group">
+                <div className="marc-indicator">0#</div>
+                <div className="marc-subfield">$k</div>
+                <input
+                  className="auth-input marc-input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <button
               className="auth-submit-btn"

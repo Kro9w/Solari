@@ -127,24 +127,36 @@ export default function Login() {
 
           <form onSubmit={handleLogin} className="auth-form">
             <div className="auth-field">
-              <label className="auth-field-label">Email</label>
-              <input
-                className="auth-input"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
+              <label className="auth-field-label">
+                <span className="marc-tag">856</span> Email
+              </label>
+              <div className="marc-input-group">
+                <div className="marc-indicator">0#</div>
+                <div className="marc-subfield">$u</div>
+                <input
+                  className="auth-input marc-input"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <div className="auth-field">
-              <label className="auth-field-label">Password</label>
-              <input
-                className="auth-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
+              <label className="auth-field-label">
+                <span className="marc-tag">856</span> Password
+              </label>
+              <div className="marc-input-group">
+                <div className="marc-indicator">0#</div>
+                <div className="marc-subfield">$k</div>
+                <input
+                  className="auth-input marc-input"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
             </div>
             <button
               className="auth-submit-btn"

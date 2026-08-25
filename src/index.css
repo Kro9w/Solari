@@ -1079,6 +1079,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .auth-shell {
   position: relative;
   animation: authEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  overflow: hidden;
 }
 
 .auth-shell.leaving {
@@ -1103,22 +1104,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @keyframes authEnter {
   from {
     opacity: 0;
-    transform: scale(1.012) translateY(6px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
 }
 
 @keyframes authExit {
   from {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
   to {
     opacity: 0;
-    transform: scale(0.985) translateY(-6px);
   }
 }
 
@@ -1150,6 +1147,41 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   text-transform: uppercase;
   color: var(--ink-faint);
   font-weight: 600;
+}
+
+.marc-tag {
+  color: var(--accent);
+  font-weight: 800;
+  margin-right: 4px;
+}
+
+.marc-input-group {
+  display: flex;
+  align-items: flex-end;
+}
+
+.marc-indicator {
+  font-family: monospace;
+  font-size: 14px;
+  color: var(--ink-faint);
+  background: var(--cream-border);
+  padding: 4px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+  margin-bottom: 4px;
+}
+
+.marc-subfield {
+  font-family: monospace;
+  font-size: 15px;
+  color: var(--accent);
+  font-weight: bold;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
+.marc-input {
+  flex: 1;
 }
 
 .auth-input {
