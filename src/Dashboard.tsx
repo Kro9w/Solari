@@ -470,7 +470,7 @@ export default function Dashboard() {
                             borderRadius: "2px",
                           }}
                         />
-                        Pass (≥75%)
+                        Pass
                       </div>
                     )}
 
@@ -490,7 +490,7 @@ export default function Dashboard() {
                             borderRadius: "2px",
                           }}
                         />
-                        Watch (50-74%)
+                        Keep Pushing
                       </div>
                     )}
 
@@ -510,7 +510,7 @@ export default function Dashboard() {
                             borderRadius: "2px",
                           }}
                         />
-                        Danger (&lt;50%)
+                        Danger
                       </div>
                     )}
                   </div>
