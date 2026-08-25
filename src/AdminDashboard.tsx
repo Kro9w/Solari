@@ -1642,12 +1642,12 @@ export default function AdminDashboard() {
                                 {!isComplete && (
                                   <span
                                     style={{
-                                      fontSize: "11px",
+                                      fontSize: "14px",
                                       color: "var(--ink-muted)",
-                                      fontStyle: "italic",
+                                      justifySelf: "center",
                                     }}
                                   >
-                                    (Incomplete)
+                                    ⏳︎
                                   </span>
                                 )}
                               </span>
