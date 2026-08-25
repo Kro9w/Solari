@@ -36,25 +36,28 @@ export default function Signup() {
 
     const normalizedSurname = lastName.trim().toLowerCase();
 
-    // 1. Check if the surname is allowed
-    const { data: allowedData, error: allowedError } = await supabase
+    // 1. Check if the surname is allowed (fetch all matches to handle duplicates)
+    const { data: allowedDataList, error: allowedError } = await supabase
       .from("allowed_surnames")
       .select("*")
-      .eq("surname", normalizedSurname)
-      .single();
+      .eq("surname", normalizedSurname);
 
     if (allowedError) {
-      if (allowedError.code === "PGRST116") {
-        setError("Your surname is not on the allowed list.");
-      } else {
-        setError("Error validating surname. Please try again.");
-      }
+      setError("Error validating surname. Please try again.");
       setLoading(false);
       return;
     }
 
-    // 2. Check if the surname is already claimed
-    if (allowedData.is_claimed) {
+    if (!allowedDataList || allowedDataList.length === 0) {
+      setError("Your surname is not on the allowed list.");
+      setLoading(false);
+      return;
+    }
+
+    // 2. Find an unclaimed slot for this surname
+    const availableSlot = allowedDataList.find((row) => !row.is_claimed);
+
+    if (!availableSlot) {
       setError("This surname has already been registered.");
       setLoading(false);
       return;
@@ -76,11 +79,11 @@ export default function Signup() {
       setError(signUpError.message);
       setLoading(false);
     } else {
-      // 4. Mark surname as claimed
+      // 4. Mark specific surname slot as claimed
       await supabase
         .from("allowed_surnames")
         .update({ is_claimed: true })
-        .eq("id", allowedData.id);
+        .eq("id", availableSlot.id);
 
       navigate("/");
     }
