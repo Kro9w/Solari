@@ -246,32 +246,51 @@ export default function AdminDashboard() {
           .eq("exam_set_id", deleteModal.targetId);
         if (setExams && setExams.length > 0) {
           const examIds = setExams.map((e) => e.id);
-          await supabase.from("exam_results").delete().in("exam_id", examIds);
-          await supabase.from("exam_sessions").delete().in("exam_id", examIds);
+          const { error: err1 } = await supabase
+            .from("exam_results")
+            .delete()
+            .in("exam_id", examIds);
+          if (err1) throw err1;
+          const { error: err2 } = await supabase
+            .from("exam_sessions")
+            .delete()
+            .in("exam_id", examIds);
+          if (err2) throw err2;
         }
 
-        await supabase
+        const { error: errExams } = await supabase
           .from("exams")
           .delete()
           .eq("exam_set_id", deleteModal.targetId);
-        await supabase
+        if (errExams) throw errExams;
+
+        const { error: errSet } = await supabase
           .from("exam_sets")
           .delete()
           .eq("id", deleteModal.targetId);
+        if (errSet) throw errSet;
+
         setStep("SELECT_OR_CREATE_SET");
         setSelectedSet(null);
       } else if (deleteModal.type === "exam") {
         // Delete dependent relations first to avoid 409 Conflict
-        await supabase
+        const { error: err1 } = await supabase
           .from("exam_results")
           .delete()
           .eq("exam_id", deleteModal.targetId);
-        await supabase
+        if (err1) throw err1;
+        const { error: err2 } = await supabase
           .from("exam_sessions")
           .delete()
           .eq("exam_id", deleteModal.targetId);
+        if (err2) throw err2;
 
-        await supabase.from("exams").delete().eq("id", deleteModal.targetId);
+        const { error: err3 } = await supabase
+          .from("exams")
+          .delete()
+          .eq("id", deleteModal.targetId);
+        if (err3) throw err3;
+
         const { data } = await supabase
           .from("exam_sets")
           .select(
@@ -289,8 +308,11 @@ export default function AdminDashboard() {
         }
       }
       await fetchExamSets();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Deletion failed:", err);
+      alert(
+        `Deletion failed: ${err.message || "Permissions or constraint error."}`,
+      );
     } finally {
       setDeleteModal({
         isOpen: false,
@@ -530,9 +552,12 @@ export default function AdminDashboard() {
         }
       });
 
-      const gwa =
-        totalWeight > 0 ? Math.round(gwaSum * (100 / totalWeight)) : 0;
-      const isPasser = gwa >= 75 && !anyBelow50;
+      // The GWA is strictly the sum of the weighted scores. It is not scaled up.
+      // E.g. getting 100 on a 20% weight exam yields 20 points towards the 75 requirement.
+      const gwa = Math.round(gwaSum);
+
+      // A student can ONLY officially be a passer if they have taken 100% of the weights.
+      const isPasser = totalWeight === 100 && gwa >= 75 && !anyBelow50;
 
       return { name: student.user_name, gwa, isPasser, totalWeight };
     });
@@ -978,25 +1003,93 @@ export default function AdminDashboard() {
               style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
               <div
-                style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
               >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "12px" }}
+                >
+                  <button
+                    onClick={() => setStep("SELECT_OR_CREATE_SET")}
+                    style={{
+                      padding: "6px 12px",
+                      background: "var(--cream-dark)",
+                      border: "1px solid var(--cream-border)",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    ← Back
+                  </button>
+                  <h2
+                    style={{ fontSize: "20px", margin: 0, color: "var(--ink)" }}
+                  >
+                    Managing: {selectedSet.title}
+                  </h2>
+                </div>
+
                 <button
-                  onClick={() => setStep("SELECT_OR_CREATE_SET")}
+                  onClick={async () => {
+                    const newPublicity = !selectedSet.is_public;
+                    try {
+                      const { error } = await supabase
+                        .from("exam_sets")
+                        .update({ is_public: newPublicity })
+                        .eq("id", selectedSet.id);
+
+                      if (error) throw error;
+
+                      // Update local state
+                      setSelectedSet({
+                        ...selectedSet,
+                        is_public: newPublicity,
+                      });
+                      setExamSets(
+                        examSets.map((set) =>
+                          set.id === selectedSet.id
+                            ? { ...set, is_public: newPublicity }
+                            : set,
+                        ),
+                      );
+                    } catch (err) {
+                      console.error("Failed to toggle publicity:", err);
+                      alert("Failed to toggle publicity.");
+                    }
+                  }}
                   style={{
-                    padding: "6px 12px",
-                    background: "var(--cream-dark)",
-                    border: "1px solid var(--cream-border)",
-                    borderRadius: "6px",
+                    padding: "8px 16px",
+                    background: selectedSet.is_public
+                      ? "var(--green-bg)"
+                      : "var(--cream-dark)",
+                    color: selectedSet.is_public
+                      ? "var(--green)"
+                      : "var(--ink-muted)",
+                    border: `1px solid ${selectedSet.is_public ? "var(--green)" : "var(--cream-border)"}`,
+                    borderRadius: "20px",
+                    fontSize: "13px",
+                    fontWeight: 600,
                     cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    transition: "all 0.2s ease",
                   }}
                 >
-                  ← Back
+                  <div
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      background: selectedSet.is_public
+                        ? "var(--green)"
+                        : "var(--ink-faint)",
+                    }}
+                  />
+                  {selectedSet.is_public ? "Public" : "Private"}
                 </button>
-                <h2
-                  style={{ fontSize: "20px", margin: 0, color: "var(--ink)" }}
-                >
-                  Managing: {selectedSet.title}
-                </h2>
               </div>
 
               <div
@@ -1444,7 +1537,8 @@ export default function AdminDashboard() {
                         marginBottom: "16px",
                       }}
                     >
-                      GWA ≥ 75% with no subject score &lt; 50%.
+                      Must complete all 6 exams. GWA ≥ 75% with no subject score
+                      &lt; 50%.
                     </div>
                     <div
                       style={{
@@ -1520,30 +1614,47 @@ export default function AdminDashboard() {
                           No results yet.
                         </div>
                       ) : (
-                        top10.map((t, i) => (
-                          <div
-                            key={i}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              padding: "12px",
-                              background:
-                                i < 3 ? "var(--accent-bg)" : "var(--cream)",
-                              border: "1px solid var(--cream-border)",
-                              borderRadius: "6px",
-                            }}
-                          >
-                            <span>
-                              <span
-                                style={{ opacity: 0.5, marginRight: "8px" }}
-                              >
-                                {i + 1}.
-                              </span>{" "}
-                              {t.name}
-                            </span>
-                            <span style={{ fontWeight: 600 }}>{t.gwa}%</span>
-                          </div>
-                        ))
+                        top10.map((t, i) => {
+                          const isComplete = t.totalWeight === 100;
+                          return (
+                            <div
+                              key={i}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                padding: "12px",
+                                background:
+                                  i < 3 && isComplete
+                                    ? "var(--accent-bg)"
+                                    : "var(--cream)",
+                                border: "1px solid var(--cream-border)",
+                                borderRadius: "6px",
+                                opacity: isComplete ? 1 : 0.6,
+                              }}
+                            >
+                              <span>
+                                <span
+                                  style={{ opacity: 0.5, marginRight: "8px" }}
+                                >
+                                  {i + 1}.
+                                </span>{" "}
+                                {t.name}{" "}
+                                {!isComplete && (
+                                  <span
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "var(--ink-muted)",
+                                      fontStyle: "italic",
+                                    }}
+                                  >
+                                    (Incomplete)
+                                  </span>
+                                )}
+                              </span>
+                              <span style={{ fontWeight: 600 }}>{t.gwa}%</span>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
