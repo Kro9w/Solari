@@ -5,6 +5,7 @@ import { parseQuestions } from "./MockExam";
 import { useNavigate } from "react-router-dom";
 import icon from "../icon.png";
 import LiveFeedback from "./LiveFeedback";
+import { withViewTransition } from "./utils/viewTransition";
 
 type Step = "SELECT_OR_CREATE_SET" | "MANAGE_SET";
 type AdminTab = "MANAGE" | "ANALYTICS" | "LIVE_FEEDBACK";
@@ -28,83 +29,31 @@ const ConfirmModal = ({
   if (!isOpen) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        background: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 9999,
-      }}
-    >
-      <div
-        style={{
-          background: "var(--cream)",
-          padding: "24px",
-          borderRadius: "10px",
-          border: "1px solid var(--cream-border)",
-          maxWidth: "400px",
-          width: "100%",
-          boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
-        }}
-      >
-        <h3
-          style={{
-            margin: "0 0 16px 0",
-            fontSize: "24px",
-            fontFamily: "var(--font-display)",
-            color: "var(--ink)",
-          }}
-        >
-          {title}
-        </h3>
-        <p
-          style={{
-            margin: "0 0 24px 0",
-            fontSize: "14px",
-            color: "var(--ink-muted)",
-            lineHeight: 1.5,
-          }}
-        >
-          {message}
-        </p>
-        <div
-          style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}
-        >
-          <button
-            onClick={onCancel}
-            disabled={loading}
-            style={{
-              padding: "8px 16px",
-              background: "var(--cream-dark)",
-              border: "1px solid var(--cream-border)",
-              borderRadius: "6px",
-              cursor: loading ? "not-allowed" : "pointer",
-              color: "var(--ink)",
-            }}
+    <div className="modal-overlay">
+      <div className="modal-card" style={{ maxWidth: "400px" }}>
+        <div className="modal-body-tight">
+          <h3 className="modal-title" style={{ marginBottom: "12px" }}>
+            {title}
+          </h3>
+          <p className="modal-message">{message}</p>
+          <div
+            style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={loading}
-            style={{
-              padding: "8px 16px",
-              background: "var(--red)",
-              border: "none",
-              borderRadius: "6px",
-              cursor: loading ? "not-allowed" : "pointer",
-              color: "white",
-              fontWeight: 500,
-            }}
-          >
-            {loading ? "Deleting..." : "Delete"}
-          </button>
+            <button
+              className="dash-btn-ghost"
+              onClick={onCancel}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              className="dash-btn-danger"
+              onClick={onConfirm}
+              disabled={loading}
+            >
+              {loading ? "Deleting…" : "Delete"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -630,18 +579,8 @@ export default function AdminDashboard() {
             <h1 className="dash-heading">Admin Dashboard</h1>
           </div>
           <button
-            onClick={() => navigate("/")}
-            style={{
-              padding: "8px 14px",
-              background: "var(--cream-dark)",
-              color: "var(--ink)",
-              border: "1px solid var(--cream-border)",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: 500,
-              fontSize: "13px",
-              transition: "all 0.2s ease",
-            }}
+            className="dash-back-btn"
+            onClick={() => withViewTransition(() => navigate("/"))}
           >
             ← Back to Portal
           </button>
@@ -649,81 +588,31 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          borderBottom: "1px solid var(--cream-border)",
-          gap: "4px",
-        }}
-      >
+      <div className="admin-tabs">
         <button
+          className={`admin-tab${activeTab === "MANAGE" ? " active" : ""}`}
           onClick={() => setActiveTab("MANAGE")}
-          style={{
-            padding: "12px 18px",
-            background: "none",
-            border: "none",
-            fontSize: "13px",
-            letterSpacing: "0.03em",
-            fontWeight: activeTab === "MANAGE" ? 600 : 500,
-            color: activeTab === "MANAGE" ? "var(--ink)" : "var(--ink-muted)",
-            borderBottom:
-              activeTab === "MANAGE"
-                ? "2px solid var(--accent)"
-                : "2px solid transparent",
-            cursor: "pointer",
-            transition: "color 0.2s ease",
-          }}
         >
           Manage Exam Sets
         </button>
         <button
+          className={`admin-tab${activeTab === "ANALYTICS" ? " active" : ""}`}
           onClick={() => setActiveTab("ANALYTICS")}
-          style={{
-            padding: "12px 18px",
-            background: "none",
-            border: "none",
-            fontSize: "13px",
-            letterSpacing: "0.03em",
-            fontWeight: activeTab === "ANALYTICS" ? 600 : 500,
-            color:
-              activeTab === "ANALYTICS" ? "var(--ink)" : "var(--ink-muted)",
-            borderBottom:
-              activeTab === "ANALYTICS"
-                ? "2px solid var(--accent)"
-                : "2px solid transparent",
-            cursor: "pointer",
-            transition: "color 0.2s ease",
-          }}
         >
           Analytics & Item Analysis
         </button>
         <button
+          className={`admin-tab${activeTab === "LIVE_FEEDBACK" ? " active" : ""}`}
           onClick={() => setActiveTab("LIVE_FEEDBACK")}
-          style={{
-            padding: "12px 18px",
-            background: "none",
-            border: "none",
-            fontSize: "13px",
-            letterSpacing: "0.03em",
-            fontWeight: activeTab === "LIVE_FEEDBACK" ? 600 : 500,
-            color:
-              activeTab === "LIVE_FEEDBACK" ? "var(--ink)" : "var(--ink-muted)",
-            borderBottom:
-              activeTab === "LIVE_FEEDBACK"
-                ? "2px solid var(--accent)"
-                : "2px solid transparent",
-            cursor: "pointer",
-            transition: "color 0.2s ease",
-          }}
         >
           Live Feedback
         </button>
       </div>
 
       {activeTab === "MANAGE" && (
-        <div style={{ marginTop: "24px" }}>
+        <div key="manage-tab" className="fade-in" style={{ marginTop: "24px" }}>
           {step === "SELECT_OR_CREATE_SET" && (
-            <div className="dashboard-split-layout">
+            <div className="dashboard-split-layout fade-in">
               <div className="dashboard-split-left">
                 <div className="dash-section-label">
                   Select Existing Exam Set
@@ -756,30 +645,11 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                           <button
+                            className="icon-btn icon-btn-danger"
                             onClick={(e) => {
                               e.stopPropagation();
                               promptDeleteSet(e, set);
                             }}
-                            style={{
-                              background: "var(--red-bg)",
-                              border: "1px solid var(--red)",
-                              color: "var(--red)",
-                              cursor: "pointer",
-                              fontSize: "14px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "6px",
-                              transition: "opacity 0.2s",
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.opacity = "0.7")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.opacity = "1")
-                            }
                             title="Delete Exam Set"
                           >
                             ×
@@ -796,18 +666,8 @@ export default function AdminDashboard() {
                 <div className="dash-panel">
                   {setMessage && (
                     <div
-                      style={{
-                        padding: "12px",
-                        marginBottom: "16px",
-                        borderRadius: "6px",
-                        background: setMessage.includes("success")
-                          ? "var(--green-bg)"
-                          : "var(--red-bg)",
-                        color: setMessage.includes("success")
-                          ? "var(--green)"
-                          : "var(--red)",
-                        fontSize: "13px",
-                      }}
+                      className={`dash-banner ${setMessage.includes("success") ? "dash-banner-success" : "dash-banner-error"}`}
+                      style={{ marginBottom: "16px" }}
                     >
                       {setMessage}
                     </div>
@@ -817,21 +677,11 @@ export default function AdminDashboard() {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: "16px",
+                      gap: "18px",
                     }}
                   >
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          fontSize: "12px",
-                          letterSpacing: "0.05em",
-                          textTransform: "uppercase",
-                          color: "var(--ink-faint)",
-                          fontWeight: 600,
-                        }}
-                      >
+                    <div className="dash-field">
+                      <label className="dash-field-label">
                         Set Title (e.g. 2026 Mock Exam)
                       </label>
                       <input
@@ -842,18 +692,8 @@ export default function AdminDashboard() {
                         className="dash-input"
                       />
                     </div>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: "6px",
-                          fontSize: "12px",
-                          letterSpacing: "0.05em",
-                          textTransform: "uppercase",
-                          color: "var(--ink-faint)",
-                          fontWeight: 600,
-                        }}
-                      >
+                    <div className="dash-field">
+                      <label className="dash-field-label">
                         Start Time (First Exam Access)
                       </label>
                       <input
@@ -874,7 +714,7 @@ export default function AdminDashboard() {
                         width: "100%",
                       }}
                     >
-                      {creatingSet ? "Creating..." : "Create Set & Proceed"}
+                      {creatingSet ? "Creating…" : "Create Set & Proceed"}
                     </button>
                   </form>
                 </div>
@@ -884,6 +724,7 @@ export default function AdminDashboard() {
 
           {step === "MANAGE_SET" && selectedSet && (
             <div
+              className="fade-in"
               style={{ display: "flex", flexDirection: "column", gap: "24px" }}
             >
               <div
@@ -898,32 +739,18 @@ export default function AdminDashboard() {
                   style={{ display: "flex", alignItems: "center", gap: "12px" }}
                 >
                   <button
+                    className="dash-back-btn"
                     onClick={() => setStep("SELECT_OR_CREATE_SET")}
-                    style={{
-                      padding: "6px 12px",
-                      background: "var(--cream-dark)",
-                      border: "1px solid var(--cream-border)",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                    }}
                   >
                     ← Back
                   </button>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-display)",
-                      fontSize: "24px",
-                      margin: 0,
-                      color: "var(--ink)",
-                    }}
-                  >
+                  <div className="dash-set-title">
                     Managing: {selectedSet.title}
                   </div>
                 </div>
 
                 <button
+                  className={`dash-pill-toggle${selectedSet.is_public ? " active" : ""}`}
                   onClick={async () => {
                     const newPublicity = !selectedSet.is_public;
                     try {
@@ -951,35 +778,8 @@ export default function AdminDashboard() {
                       alert("Failed to toggle publicity.");
                     }
                   }}
-                  style={{
-                    padding: "8px 16px",
-                    background: selectedSet.is_public
-                      ? "var(--green-bg)"
-                      : "var(--cream-dark)",
-                    color: selectedSet.is_public
-                      ? "var(--green)"
-                      : "var(--ink-muted)",
-                    border: `1px solid ${selectedSet.is_public ? "var(--green)" : "var(--cream-border)"}`,
-                    borderRadius: "20px",
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    transition: "all 0.2s ease",
-                  }}
                 >
-                  <div
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: selectedSet.is_public
-                        ? "var(--green)"
-                        : "var(--ink-faint)",
-                    }}
-                  />
+                  <span className="dash-pill-dot" />
                   {selectedSet.is_public ? "Public" : "Private"}
                 </button>
               </div>
@@ -1104,6 +904,7 @@ export default function AdminDashboard() {
                                 if (isClosed) {
                                   return (
                                     <button
+                                      className={`icon-btn${exam.is_reopened ? " icon-btn-success" : ""}`}
                                       onClick={async () => {
                                         const newStatus = !exam.is_reopened;
                                         try {
@@ -1138,24 +939,6 @@ export default function AdminDashboard() {
                                           );
                                         }
                                       }}
-                                      style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        width: "32px",
-                                        height: "32px",
-                                        background: exam.is_reopened
-                                          ? "var(--green-bg)"
-                                          : "var(--cream-dark)",
-                                        color: exam.is_reopened
-                                          ? "var(--green)"
-                                          : "var(--ink-muted)",
-                                        border: `1px solid ${exam.is_reopened ? "var(--green)" : "var(--cream-border)"}`,
-                                        borderRadius: "6px",
-                                        cursor: "pointer",
-                                        transition: "all 0.2s ease",
-                                        fontSize: "14px",
-                                      }}
                                       title={
                                         exam.is_reopened
                                           ? "Close reopened exam"
@@ -1169,21 +952,8 @@ export default function AdminDashboard() {
                                 return null;
                               })()}
                               <button
+                                className="icon-btn icon-btn-danger"
                                 onClick={() => promptDeleteExam(exam)}
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  width: "32px",
-                                  height: "32px",
-                                  background: "var(--red-bg)",
-                                  color: "var(--red)",
-                                  border: "1px solid var(--red)",
-                                  borderRadius: "6px",
-                                  cursor: "pointer",
-                                  fontSize: "14px",
-                                  transition: "all 0.2s ease",
-                                }}
                                 title="Delete Exam"
                               >
                                 ×
@@ -1217,18 +987,8 @@ export default function AdminDashboard() {
                       <div className="dash-panel">
                         {uploadMessage && (
                           <div
-                            style={{
-                              padding: "12px",
-                              marginBottom: "16px",
-                              borderRadius: "6px",
-                              background: uploadMessage.includes("success")
-                                ? "var(--green-bg)"
-                                : "var(--red-bg)",
-                              color: uploadMessage.includes("success")
-                                ? "var(--green)"
-                                : "var(--red)",
-                              fontSize: "13px",
-                            }}
+                            className={`dash-banner ${uploadMessage.includes("success") ? "dash-banner-success" : "dash-banner-error"}`}
+                            style={{ marginBottom: "16px" }}
                           >
                             {uploadMessage}
                           </div>
@@ -1238,21 +998,11 @@ export default function AdminDashboard() {
                           style={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: "16px",
+                            gap: "18px",
                           }}
                         >
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                marginBottom: "6px",
-                                fontSize: "12px",
-                                letterSpacing: "0.05em",
-                                textTransform: "uppercase",
-                                color: "var(--ink-faint)",
-                                fontWeight: 600,
-                              }}
-                            >
+                          <div className="dash-field">
+                            <label className="dash-field-label">
                               Exam Title
                             </label>
                             <input
@@ -1263,18 +1013,8 @@ export default function AdminDashboard() {
                               className="dash-input"
                             />
                           </div>
-                          <div>
-                            <label
-                              style={{
-                                display: "block",
-                                marginBottom: "6px",
-                                fontSize: "12px",
-                                letterSpacing: "0.05em",
-                                textTransform: "uppercase",
-                                color: "var(--ink-faint)",
-                                fontWeight: 600,
-                              }}
-                            >
+                          <div className="dash-field">
+                            <label className="dash-field-label">
                               Exam File (.txt)
                             </label>
                             <input
@@ -1284,16 +1024,8 @@ export default function AdminDashboard() {
                               onChange={handleFileChange}
                               required
                               className="dash-input"
-                              style={{ padding: "8px 12px" }}
                             />
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                color: "var(--ink-faint)",
-                                marginTop: "6px",
-                                lineHeight: 1.4,
-                              }}
-                            >
+                            <div className="dash-field-hint">
                               File must start with a subject code and contain
                               exactly 100 questions.
                             </div>
@@ -1304,7 +1036,7 @@ export default function AdminDashboard() {
                             className="dash-exam-btn"
                             style={{ padding: "12px", marginTop: "12px" }}
                           >
-                            {uploading ? "Uploading..." : "Upload Exam"}
+                            {uploading ? "Uploading…" : "Upload Exam"}
                           </button>
                         </form>
                       </div>
@@ -1318,40 +1050,26 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === "ANALYTICS" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div
-            style={{
-              background: "var(--cream-dark)",
-              padding: "24px",
-              borderRadius: "10px",
-              border: "1px solid var(--cream-border)",
-            }}
-          >
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                  }}
-                >
-                  Select Exam Set
-                </label>
+        <div
+          key="analytics-tab"
+          className="fade-in"
+          style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+        >
+          <div className="dash-panel">
+            <div style={{ display: "flex", gap: "28px", flexWrap: "wrap" }}>
+              <div
+                className="dash-field"
+                style={{ flex: 1, minWidth: "200px" }}
+              >
+                <label className="dash-field-label">Select Exam Set</label>
                 <select
+                  className="dash-select"
                   value={analyticsSetId}
                   onChange={(e) => {
                     setAnalyticsSetId(e.target.value);
                     setAnalyticsExamId("ALL");
                   }}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--cream-border)",
-                    background: "var(--cream)",
-                  }}
+                  style={{ width: "100%" }}
                 >
                   {examSets.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -1362,28 +1080,17 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: "8px",
-                    fontSize: "14px",
-                    fontWeight: 500,
-                  }}
-                >
-                  Select View
-                </label>
+              <div
+                className="dash-field"
+                style={{ flex: 1, minWidth: "200px" }}
+              >
+                <label className="dash-field-label">Select View</label>
                 <select
+                  className="dash-select"
                   value={analyticsExamId}
                   onChange={(e) => setAnalyticsExamId(e.target.value)}
                   disabled={!currentSet}
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: "6px",
-                    border: "1px solid var(--cream-border)",
-                    background: "var(--cream)",
-                  }}
+                  style={{ width: "100%" }}
                 >
                   <option value="ALL">
                     Overall Set Statistics (Passers & Top 10)
@@ -1444,19 +1151,10 @@ export default function AdminDashboard() {
                         passers.map((p, i) => (
                           <div
                             key={i}
-                            style={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              padding: "12px",
-                              background: "var(--green-bg)",
-                              borderRadius: "6px",
-                              border: "1px solid var(--cream-border)",
-                            }}
+                            className="dash-list-row dash-list-row-good"
                           >
                             <span>{p.name}</span>
-                            <span
-                              style={{ fontWeight: 600, color: "var(--green)" }}
-                            >
+                            <span className="dash-list-value dash-list-value-good">
                               {p.gwa}%
                             </span>
                           </div>
@@ -1498,39 +1196,23 @@ export default function AdminDashboard() {
                           return (
                             <div
                               key={i}
-                              style={{
-                                display: "flex",
-                                justifyContent: "space-between",
-                                padding: "12px",
-                                background:
-                                  i < 3 && isComplete
-                                    ? "var(--accent-bg)"
-                                    : "var(--cream)",
-                                border: "1px solid var(--cream-border)",
-                                borderRadius: "6px",
-                                opacity: isComplete ? 1 : 0.6,
-                              }}
+                              className={`dash-list-row${i < 3 && isComplete ? " dash-list-row-accent" : ""}${!isComplete ? " dash-list-row-muted" : ""}`}
                             >
                               <span>
-                                <span
-                                  style={{ opacity: 0.5, marginRight: "8px" }}
-                                >
-                                  {i + 1}.
-                                </span>{" "}
+                                <span className="dash-list-rank">{i + 1}.</span>{" "}
                                 {t.name}{" "}
                                 {!isComplete && (
                                   <span
                                     style={{
                                       fontSize: "14px",
                                       color: "var(--ink-muted)",
-                                      justifySelf: "center",
                                     }}
                                   >
                                     ⏳︎
                                   </span>
                                 )}
                               </span>
-                              <span style={{ fontWeight: 600 }}>{t.gwa}%</span>
+                              <span className="dash-list-value">{t.gwa}%</span>
                             </div>
                           );
                         })
@@ -1557,35 +1239,11 @@ export default function AdminDashboard() {
                       }}
                     >
                       {itemAnalysis.map((item: any, idx: number) => (
-                        <div
-                          key={idx}
-                          style={{
-                            padding: "24px",
-                            border: "1px solid var(--cream-border)",
-                            borderRadius: "10px",
-                            background: "var(--cream)",
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: "14px",
-                              color: "var(--ink-muted)",
-                              marginBottom: "8px",
-                            }}
-                          >
+                        <div key={idx} className="dash-question-card">
+                          <div className="dash-question-eyebrow">
                             Question {item.questionNum}
                           </div>
-                          <div
-                            style={{
-                              fontSize: "16px",
-                              color: "var(--ink)",
-                              fontWeight: 500,
-                              marginBottom: "20px",
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {item.stem}
-                          </div>
+                          <div className="dash-question-stem">{item.stem}</div>
 
                           <div
                             style={{
@@ -1608,80 +1266,21 @@ export default function AdminDashboard() {
                               return (
                                 <div
                                   key={opt.letter}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "space-between",
-                                    padding: "12px 16px",
-                                    background: isCorrect
-                                      ? "var(--green-bg)"
-                                      : "var(--cream-dark)",
-                                    border: `1px solid ${isCorrect ? "var(--green)" : "var(--cream-border)"}`,
-                                    borderRadius: "6px",
-                                  }}
+                                  className={`dash-option-row${isCorrect ? " correct" : ""}`}
                                 >
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: "16px",
-                                      flex: 1,
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        width: "28px",
-                                        height: "28px",
-                                        borderRadius: "50%",
-                                        border: `1px solid ${isCorrect ? "var(--green)" : "var(--ink-muted)"}`,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        fontSize: "13px",
-                                        fontWeight: 500,
-                                        color: isCorrect
-                                          ? "var(--green)"
-                                          : "var(--ink-muted)",
-                                        flexShrink: 0,
-                                      }}
-                                    >
+                                  <div className="dash-option-main">
+                                    <div className="dash-option-letter">
                                       {opt.letter}
                                     </div>
-                                    <div
-                                      style={{
-                                        fontSize: "14px",
-                                        color: "var(--ink)",
-                                        lineHeight: 1.4,
-                                      }}
-                                    >
+                                    <div className="dash-option-text">
                                       {opt.text}
                                     </div>
                                   </div>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      alignItems: "flex-end",
-                                      flexShrink: 0,
-                                      marginLeft: "16px",
-                                    }}
-                                  >
-                                    <div
-                                      style={{
-                                        fontWeight: 600,
-                                        color: isCorrect
-                                          ? "var(--green)"
-                                          : "var(--ink)",
-                                      }}
-                                    >
+                                  <div className="dash-option-tally">
+                                    <div className="dash-option-count">
                                       {count}
                                     </div>
-                                    <div
-                                      style={{
-                                        fontSize: "11px",
-                                        color: "var(--ink-muted)",
-                                      }}
-                                    >
+                                    <div className="dash-option-percent">
                                       {percent}%
                                     </div>
                                   </div>
@@ -1690,47 +1289,18 @@ export default function AdminDashboard() {
                             })}
 
                             {item.tally["No Answer"] > 0 && (
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  padding: "12px 16px",
-                                  background: "var(--cream-dark)",
-                                  border: "1px dashed var(--cream-border)",
-                                  borderRadius: "6px",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontSize: "14px",
-                                    color: "var(--ink-muted)",
-                                    fontStyle: "italic",
-                                  }}
-                                >
+                              <div className="dash-option-row skip">
+                                <div className="dash-option-text skip">
                                   No Answer / Skipped
                                 </div>
-                                <div
-                                  style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "flex-end",
-                                  }}
-                                >
+                                <div className="dash-option-tally">
                                   <div
-                                    style={{
-                                      fontWeight: 600,
-                                      color: "var(--ink-muted)",
-                                    }}
+                                    className="dash-option-count"
+                                    style={{ color: "var(--ink-muted)" }}
                                   >
                                     {item.tally["No Answer"]}
                                   </div>
-                                  <div
-                                    style={{
-                                      fontSize: "11px",
-                                      color: "var(--ink-muted)",
-                                    }}
-                                  >
+                                  <div className="dash-option-percent">
                                     {Math.round(
                                       (item.tally["No Answer"] /
                                         analyticsResults.length) *
@@ -1754,7 +1324,7 @@ export default function AdminDashboard() {
       )}
 
       {activeTab === "LIVE_FEEDBACK" && (
-        <div className="admin-content-card">
+        <div key="live-feedback-tab" className="admin-content-card fade-in">
           <LiveFeedback />
         </div>
       )}

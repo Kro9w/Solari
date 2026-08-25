@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Dashboard from "./Dashboard";
 import MockExam from "./MockExam";
 import { loadJSON, saveJSON } from "./utils/storage";
+import { withViewTransition } from "./utils/viewTransition";
 import { useAuth } from "./contexts/AuthContext";
 import { supabase } from "./lib/supabase";
 import { useNavigate } from "react-router-dom";
@@ -149,7 +150,7 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    withViewTransition(() => navigate("/login"));
   };
 
   return (
@@ -218,7 +219,7 @@ export default function App() {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {isAdmin && (
             <button
-              onClick={() => navigate("/admin")}
+              onClick={() => withViewTransition(() => navigate("/admin"))}
               style={{
                 padding: "7px 14px",
                 background: "transparent",
@@ -281,6 +282,7 @@ export default function App() {
           flex: 1,
           minHeight: 0 /* crucial for nested flex scrolling */,
           overflowY: "auto",
+          scrollbarGutter: "stable",
           padding: 0,
           display: "block",
           flexDirection: "column",

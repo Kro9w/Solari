@@ -4,6 +4,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { Bookmark } from "lucide-react";
 import icon from "../icon.png";
+import { withViewTransition } from "./utils/viewTransition";
 
 export type Option = { letter: string; text: string; correct: boolean };
 export type Question = {
@@ -624,6 +625,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           style={{
             flex: 1,
             overflowY: "auto",
+            scrollbarGutter: "stable",
             padding: "0 24px",
             display: "flex",
             flexDirection: "column",
@@ -868,6 +870,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                 <div
                   style={{
                     overflowY: "auto",
+                    scrollbarGutter: "stable",
                     flex: 1,
                     paddingRight: "8px",
                     display: "flex",
@@ -1228,7 +1231,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </p>
 
           <button
-            onClick={() => navigate("/")}
+            onClick={() => withViewTransition(() => navigate("/"))}
             style={{
               width: "100%",
               padding: "13px",

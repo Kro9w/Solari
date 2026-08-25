@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "./contexts/AuthContext";
 import { DEFAULT_SUBJECTS, getDaysUntil } from "./App";
 import { parseQuestions } from "./MockExam";
+import { withViewTransition } from "./utils/viewTransition";
 
 const EXAM_DATE = new Date("2026-09-03");
 
@@ -73,7 +74,7 @@ export default function Dashboard() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    withViewTransition(() => navigate("/login"));
   };
 
   if (loading)
@@ -285,7 +286,11 @@ export default function Dashboard() {
                         ) : (
                           <button
                             className="dash-exam-btn"
-                            onClick={() => navigate(`/exam/${exam.id}`)}
+                            onClick={() =>
+                              withViewTransition(() =>
+                                navigate(`/exam/${exam.id}`),
+                              )
+                            }
                             disabled={!isTimeWindowOpen}
                           >
                             {originalTimeWindowOpen
@@ -747,6 +752,7 @@ export default function Dashboard() {
               style={{
                 flex: 1,
                 overflowY: "auto",
+                scrollbarGutter: "stable",
                 padding: "24px",
                 display: "flex",
                 flexDirection: "column",

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 import icon from "../icon.png";
+import { withViewTransition } from "./utils/viewTransition";
 
 const EXAM_DATE = new Date("2026-09-03");
 const TICKS = Array.from({ length: 24 }, (_, i) => i);
@@ -85,7 +86,7 @@ export default function Signup() {
         .update({ is_claimed: true })
         .eq("id", availableSlot.id);
 
-      navigate("/");
+      withViewTransition(() => navigate("/"));
     }
   };
 

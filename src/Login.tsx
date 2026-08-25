@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 import icon from "../icon.png";
+import { withViewTransition } from "./utils/viewTransition";
 
 const EXAM_DATE = new Date("2026-09-03");
 const TICKS = Array.from({ length: 24 }, (_, i) => i);
@@ -61,7 +62,7 @@ export default function Login() {
       setError(error.message);
       setLoading(false);
     } else {
-      navigate("/");
+      withViewTransition(() => navigate("/"));
     }
   };
 
@@ -187,7 +188,7 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="auth-switch" style={{ marginBottom: "12px" }}>
+          <div className="auth-switch">
             Don't have an account?{" "}
             <Link to="/signup" className="auth-link" onClick={goToSignup}>
               Sign up
@@ -244,7 +245,7 @@ export default function Login() {
                 const { error } = await supabase.auth.resetPasswordForEmail(
                   resetEmail,
                   {
-                    redirectTo: window.location.origin + "/login",
+                    redirectTo: window.location.origin,
                   },
                 );
                 if (error) {
