@@ -239,6 +239,17 @@ export default function AdminDashboard() {
 
     try {
       if (deleteModal.type === "set") {
+        // Fetch all exams in the set to delete their children first (cascading)
+        const { data: setExams } = await supabase
+          .from("exams")
+          .select("id")
+          .eq("exam_set_id", deleteModal.targetId);
+        if (setExams && setExams.length > 0) {
+          const examIds = setExams.map((e) => e.id);
+          await supabase.from("exam_results").delete().in("exam_id", examIds);
+          await supabase.from("exam_sessions").delete().in("exam_id", examIds);
+        }
+
         await supabase
           .from("exams")
           .delete()
@@ -250,6 +261,16 @@ export default function AdminDashboard() {
         setStep("SELECT_OR_CREATE_SET");
         setSelectedSet(null);
       } else if (deleteModal.type === "exam") {
+        // Delete dependent relations first to avoid 409 Conflict
+        await supabase
+          .from("exam_results")
+          .delete()
+          .eq("exam_id", deleteModal.targetId);
+        await supabase
+          .from("exam_sessions")
+          .delete()
+          .eq("exam_id", deleteModal.targetId);
+
         await supabase.from("exams").delete().eq("id", deleteModal.targetId);
         const { data } = await supabase
           .from("exam_sets")
