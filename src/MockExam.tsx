@@ -164,6 +164,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
   const [syncStatus, setSyncStatus] = useState<
     "synced" | "syncing" | "offline"
   >("synced");
+  const [isLateTaker, setIsLateTaker] = useState(false);
 
   useEffect(() => {
     async function loadExam() {
@@ -207,6 +208,8 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             secondsUntilEnd,
             standardDurationSeconds,
           );
+        } else if (now > endTime) {
+          setIsLateTaker(true);
         }
 
         let loadedQuestions: Question[] | null = null;
@@ -327,6 +330,27 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
     const saveSession = async () => {
       setSyncStatus("syncing");
+
+      // If they are a late taker, explicitly check if the admin turned the reopen toggle off mid-exam
+      if (isLateTaker) {
+        try {
+          const { data: currentExam } = await supabase
+            .from("exams")
+            .select("is_reopened")
+            .eq("id", examId)
+            .single();
+          if (currentExam && currentExam.is_reopened === false) {
+            alert(
+              "The administrator has closed this exam. Your progress will be submitted now.",
+            );
+            finishExam(latestElapsedRef.current);
+            return;
+          }
+        } catch (err) {
+          // Ignore network errors here, let the session save offline
+        }
+      }
+
       const state = {
         questions,
         answers,

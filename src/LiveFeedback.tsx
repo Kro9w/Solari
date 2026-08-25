@@ -184,9 +184,11 @@ export default function LiveFeedback() {
   // Group by exam
   const grouped = sessions.reduce(
     (acc, curr) => {
-      const examCode = curr.exam?.subject_code || "Unknown Exam";
-      if (!acc[examCode]) acc[examCode] = [];
-      acc[examCode].push(curr);
+      const examName = curr.exam
+        ? `${curr.exam.title} (${curr.exam.subject_code})`
+        : "Unknown Exam";
+      if (!acc[examName]) acc[examName] = [];
+      acc[examName].push(curr);
       return acc;
     },
     {} as Record<string, any[]>,
@@ -227,9 +229,9 @@ export default function LiveFeedback() {
         </button>
       </div>
 
-      {Object.entries(grouped).map(([examCode, examSessions]) => (
+      {Object.entries(grouped).map(([examName, examSessions]) => (
         <div
-          key={examCode}
+          key={examName}
           style={{
             background: "var(--cream)",
             border: "1px solid var(--cream-border)",
@@ -245,7 +247,7 @@ export default function LiveFeedback() {
               color: "var(--ink)",
             }}
           >
-            {examCode}
+            {examName}
           </h3>
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
