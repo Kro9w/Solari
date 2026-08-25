@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import { useAuth } from "./contexts/AuthContext";
 import { useNavigate, useParams } from "react-router-dom";
 import { Bookmark } from "lucide-react";
+import { Loader } from "./components/Loader";
 import icon from "../icon.png";
 import { withViewTransition } from "./utils/viewTransition";
 
@@ -456,7 +457,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     setPhase("review");
   }
 
-  if (loading) return <div style={{ padding: "24px" }}>Loading exam...</div>;
+  if (loading) return <Loader />;
   if (error)
     return <div style={{ padding: "24px", color: "var(--red)" }}>{error}</div>;
 

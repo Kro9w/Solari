@@ -6,6 +6,7 @@ import Login from "./Login";
 import Signup from "./Signup";
 import AdminDashboard from "./AdminDashboard";
 import MockExam from "./MockExam";
+import { Loader } from "./components/Loader";
 
 const ProtectedRoute = ({
   children,
@@ -27,7 +28,7 @@ const ProtectedRoute = ({
           background: "var(--cream)",
         }}
       >
-        Loading...
+        <Loader />
       </div>
     );
   }

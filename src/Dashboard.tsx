@@ -5,6 +5,7 @@ import { useAuth } from "./contexts/AuthContext";
 import { DEFAULT_SUBJECTS, getDaysUntil } from "./App";
 import { parseQuestions } from "./MockExam";
 import { withViewTransition } from "./utils/viewTransition";
+import { Loader } from "./components/Loader";
 
 const EXAM_DATE = new Date("2026-09-03");
 
@@ -77,8 +78,7 @@ export default function Dashboard() {
     withViewTransition(() => navigate("/login"));
   };
 
-  if (loading)
-    return <div style={{ padding: "24px" }}>Loading dashboard...</div>;
+  if (loading) return <Loader />;
 
   const displayName = user?.user_metadata?.first_name
     ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()

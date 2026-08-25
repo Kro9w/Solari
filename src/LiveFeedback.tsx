@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
+import { Loader } from "./components/Loader";
 
 function MobileGridModal({
   isOpen,
@@ -76,11 +77,7 @@ export default function LiveFeedback() {
   }, []);
 
   if (loading) {
-    return (
-      <div style={{ padding: "40px 0", color: "var(--ink-muted)" }}>
-        Loading live feedback…
-      </div>
-    );
+    return <Loader />;
   }
 
   if (sessions.length === 0) {

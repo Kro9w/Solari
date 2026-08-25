@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { DEFAULT_SUBJECTS } from "./App";
 import { parseQuestions } from "./MockExam";
+import { Loader } from "./components/Loader";
 import { useNavigate } from "react-router-dom";
 import icon from "../icon.png";
 import LiveFeedback from "./LiveFeedback";
@@ -619,7 +620,11 @@ export default function AdminDashboard() {
                 </div>
                 <div className="dash-panel">
                   {loadingSets ? (
-                    <div>Loading...</div>
+                    <div
+                      style={{ color: "var(--ink-muted)", padding: "12px 0" }}
+                    >
+                      Loading sets...
+                    </div>
                   ) : examSets.length === 0 ? (
                     <div
                       style={{ color: "var(--ink-muted)", fontSize: "14px" }}
@@ -1106,15 +1111,7 @@ export default function AdminDashboard() {
           </div>
 
           {analyticsLoading ? (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "40px",
-                color: "var(--ink-muted)",
-              }}
-            >
-              Loading analytics...
-            </div>
+            <Loader />
           ) : (
             <>
               {analyticsExamId === "ALL" && (
