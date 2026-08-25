@@ -153,6 +153,40 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: block;
 }
 
+/* Global Tooltip Styles */
+.has-tooltip {
+  position: relative;
+}
+
+.has-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background: var(--ink);
+  color: var(--cream);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+  z-index: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.has-tooltip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(-4px);
+}
+
 .hamburger-btn {
   display: none;
   background: none;
@@ -1334,6 +1368,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   line-height: 1;
 }
 
+.dash-input {
+  width: 100%;
+}
+
 .dash-stat-label {
   font-size: 11px;
   letter-spacing: 0.06em;
@@ -1485,6 +1523,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-top: 1px dashed var(--accent);
 }
 
+.dash-chart-gridline.danger {
+  border-top: 1px dashed var(--red);
+}
+
 .dash-chart-gridline-label {
   position: absolute;
   right: 0;
@@ -1492,9 +1534,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 9px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--accent);
   background: var(--cream);
   padding-left: 6px;
+}
+
+.dash-chart-gridline-label.pass {
+  color: var(--accent);
+}
+
+.dash-chart-gridline-label.danger {
+  color: var(--red);
 }
 
 .dash-chart-bars {
@@ -1524,6 +1573,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex: 1;
   justify-content: center;
+  position: relative;
+  height: 100%;
 }
 
 .dash-bar {
@@ -1532,6 +1583,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 3px 3px 0 0;
   min-height: 3px;
   transition: height 0.4s ease;
+}
+
+.dash-bar-raw {
+  background: var(--cream-border);
+  position: absolute;
+  bottom: 0;
+  z-index: 1;
+  opacity: 0.6;
+}
+
+.dash-bar-weighted {
+  position: absolute;
+  bottom: 0;
+  z-index: 2;
 }
 
 .dash-bar-danger {

@@ -123,7 +123,6 @@ export default function AdminDashboard() {
   // Create Set State
   const [setTitle, setSetTitle] = useState("");
   const [setAccessibleAt, setSetAccessibleAt] = useState("");
-  const [setIsPublic, setSetIsPublic] = useState(false);
   const [creatingSet, setCreatingSet] = useState(false);
   const [setMessage, setSetMessage] = useState("");
 
@@ -169,7 +168,7 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from("exam_sets")
       .select(
-        "*, exams(id, title, subject_code, duration_minutes, accessible_at, file_content)",
+        "*, exams(id, title, subject_code, duration_minutes, accessible_at, file_content, is_reopened)",
       )
       .order("created_at", { ascending: false });
 
@@ -212,7 +211,7 @@ export default function AdminDashboard() {
         .insert({
           title: setTitle,
           accessible_at: new Date(setAccessibleAt).toISOString(),
-          is_public: setIsPublic,
+          is_public: false, // Default to negative/private
         })
         .select()
         .single();
@@ -220,7 +219,6 @@ export default function AdminDashboard() {
       setSetMessage("Exam set created successfully!");
       setSetTitle("");
       setSetAccessibleAt("");
-      setSetIsPublic(false);
       await fetchExamSets();
       if (data) {
         setSelectedSet({ ...data, exams: [] });
@@ -294,7 +292,7 @@ export default function AdminDashboard() {
         const { data } = await supabase
           .from("exam_sets")
           .select(
-            "*, exams(id, title, subject_code, duration_minutes, accessible_at)",
+            "*, exams(id, title, subject_code, duration_minutes, accessible_at, is_reopened)",
           )
           .eq("id", selectedSet.id)
           .single();
@@ -605,7 +603,7 @@ export default function AdminDashboard() {
   const itemAnalysis = getItemAnalysis();
 
   return (
-    <div style={{ padding: "24px", maxWidth: "800px", margin: "0 auto" }}>
+    <div className="dash-shell">
       <ConfirmModal
         isOpen={deleteModal.isOpen}
         title={`Delete ${deleteModal.type === "set" ? "Exam Set" : "Exam"}?`}
@@ -615,70 +613,39 @@ export default function AdminDashboard() {
         loading={deleteModal.loading}
       />
 
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "24px",
-          gap: "16px",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <img
-            src={icon}
-            alt=""
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 9,
-              boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
-              flexShrink: 0,
-            }}
-          />
-          <div>
-            <div
-              style={{
-                fontSize: "11px",
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "var(--accent)",
-                fontWeight: 600,
-                marginBottom: "3px",
-              }}
-            >
-              SolariWEB Exam Portal
-            </div>
-            <h1
-              style={{
-                fontSize: "24px",
-                fontFamily: "var(--font-display)",
-                margin: 0,
-                color: "var(--ink)",
-                lineHeight: 1.2,
-              }}
-            >
-              Admin Dashboard
-            </h1>
-          </div>
-        </div>
-        <button
-          onClick={() => navigate("/")}
+      {/* ── masthead ── */}
+      <div className="dash-header">
+        <div
           style={{
-            padding: "8px 14px",
-            background: "var(--cream-dark)",
-            color: "var(--ink)",
-            border: "1px solid var(--cream-border)",
-            borderRadius: "6px",
-            cursor: "pointer",
-            fontWeight: 500,
-            fontSize: "13px",
-            transition: "all 0.2s ease",
+            position: "relative",
+            zIndex: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            width: "100%",
           }}
         >
-          ← Back to Dashboard
-        </button>
+          <div>
+            <div className="dash-eyebrow">SolariWEB Administration</div>
+            <h1 className="dash-heading">Admin Dashboard</h1>
+          </div>
+          <button
+            onClick={() => navigate("/")}
+            style={{
+              padding: "8px 14px",
+              background: "var(--cream-dark)",
+              color: "var(--ink)",
+              border: "1px solid var(--cream-border)",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: 500,
+              fontSize: "13px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            ← Back to Portal
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -686,7 +653,6 @@ export default function AdminDashboard() {
         style={{
           display: "flex",
           borderBottom: "1px solid var(--cream-border)",
-          marginBottom: "24px",
           gap: "4px",
         }}
       >
@@ -755,245 +721,163 @@ export default function AdminDashboard() {
       </div>
 
       {activeTab === "MANAGE" && (
-        <>
+        <div style={{ marginTop: "24px" }}>
           {step === "SELECT_OR_CREATE_SET" && (
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "24px" }}
-            >
-              <div
-                style={{
-                  background: "var(--cream-dark)",
-                  padding: "24px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--cream-border)",
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    marginBottom: "16px",
-                    color: "var(--ink)",
-                  }}
-                >
+            <div className="dashboard-split-layout">
+              <div className="dashboard-split-left">
+                <div className="dash-section-label">
                   Select Existing Exam Set
-                </h2>
-                {loadingSets ? (
-                  <div>Loading...</div>
-                ) : examSets.length === 0 ? (
-                  <div style={{ color: "var(--ink-muted)" }}>
-                    No exam sets exist yet. Please create one below.
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "12px",
-                      gridTemplateColumns: "1fr 1fr",
-                    }}
-                  >
-                    {examSets.map((set) => (
-                      <div
-                        key={set.id}
-                        onClick={() => {
-                          setSelectedSet(set);
-                          setStep("MANAGE_SET");
-                        }}
-                        style={{
-                          padding: "16px",
-                          border: "1px solid var(--cream-border)",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          background: "var(--cream)",
-                          transition: "background 0.2s",
-                          position: "relative",
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.background =
-                            "var(--cream-dark)")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.background = "var(--cream)")
-                        }
-                      >
+                </div>
+                <div className="dash-panel">
+                  {loadingSets ? (
+                    <div>Loading...</div>
+                  ) : examSets.length === 0 ? (
+                    <div
+                      style={{ color: "var(--ink-muted)", fontSize: "14px" }}
+                    >
+                      No exam sets exist yet. Please create one on the right.
+                    </div>
+                  ) : (
+                    <div>
+                      {examSets.map((set) => (
                         <div
-                          style={{
-                            fontWeight: 600,
-                            marginBottom: "4px",
-                            paddingRight: "24px",
+                          key={set.id}
+                          className="dash-exam-row"
+                          onClick={() => {
+                            setSelectedSet(set);
+                            setStep("MANAGE_SET");
                           }}
+                          style={{ cursor: "pointer", padding: "16px 0" }}
                         >
-                          {set.title}
+                          <div>
+                            <div className="dash-exam-title">{set.title}</div>
+                            <div className="dash-exam-code">
+                              {set.exams?.length || 0}/6 Exams uploaded
+                            </div>
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              promptDeleteSet(e, set);
+                            }}
+                            style={{
+                              background: "var(--red-bg)",
+                              border: "1px solid var(--red)",
+                              color: "var(--red)",
+                              cursor: "pointer",
+                              fontSize: "14px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: "32px",
+                              height: "32px",
+                              borderRadius: "6px",
+                              transition: "opacity 0.2s",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.opacity = "0.7")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.opacity = "1")
+                            }
+                            title="Delete Exam Set"
+                          >
+                            ×
+                          </button>
                         </div>
-                        <div
-                          style={{
-                            fontSize: "12px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          {set.exams?.length || 0}/6 Exams uploaded
-                        </div>
-                        <button
-                          onClick={(e) => promptDeleteSet(e, set)}
-                          style={{
-                            position: "absolute",
-                            top: "12px",
-                            right: "12px",
-                            background: "none",
-                            border: "none",
-                            color: "var(--red)",
-                            cursor: "pointer",
-                            fontSize: "16px",
-                            opacity: 0.6,
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.opacity = "1")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.opacity = "0.6")
-                          }
-                          title="Delete Exam Set"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div
-                style={{
-                  background: "var(--cream-dark)",
-                  padding: "24px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--cream-border)",
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    marginBottom: "16px",
-                    color: "var(--ink)",
-                  }}
-                >
-                  Create New Exam Set
-                </h2>
-                {setMessage && (
-                  <div
-                    style={{
-                      padding: "12px",
-                      marginBottom: "16px",
-                      borderRadius: "6px",
-                      background: setMessage.includes("success")
-                        ? "var(--green-bg)"
-                        : "var(--red-bg)",
-                      color: setMessage.includes("success")
-                        ? "var(--green)"
-                        : "var(--red)",
-                    }}
-                  >
-                    {setMessage}
-                  </div>
-                )}
-                <form
-                  onSubmit={handleCreateSet}
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px",
-                  }}
-                >
-                  <div>
-                    <label
+              <div className="dashboard-split-right">
+                <div className="dash-section-label">Create New Exam Set</div>
+                <div className="dash-panel">
+                  {setMessage && (
+                    <div
                       style={{
-                        display: "block",
-                        marginBottom: "4px",
-                        fontSize: "14px",
-                        color: "var(--ink-muted)",
+                        padding: "12px",
+                        marginBottom: "16px",
+                        borderRadius: "6px",
+                        background: setMessage.includes("success")
+                          ? "var(--green-bg)"
+                          : "var(--red-bg)",
+                        color: setMessage.includes("success")
+                          ? "var(--green)"
+                          : "var(--red)",
+                        fontSize: "13px",
                       }}
                     >
-                      Set Title (e.g. 2026 Mock Exam)
-                    </label>
-                    <input
-                      type="text"
-                      value={setTitle}
-                      onChange={(e) => setSetTitle(e.target.value)}
-                      required
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--cream-border)",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: "4px",
-                        fontSize: "14px",
-                        color: "var(--ink-muted)",
-                      }}
-                    >
-                      Start Time (First Exam Access)
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={setAccessibleAt}
-                      onChange={(e) => setSetAccessibleAt(e.target.value)}
-                      required
-                      style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        borderRadius: "6px",
-                        border: "1px solid var(--cream-border)",
-                      }}
-                    />
-                  </div>
-                  <div
+                      {setMessage}
+                    </div>
+                  )}
+                  <form
+                    onSubmit={handleCreateSet}
                     style={{
                       display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
+                      flexDirection: "column",
+                      gap: "16px",
                     }}
                   >
-                    <input
-                      type="checkbox"
-                      id="isPublic"
-                      checked={setIsPublic}
-                      onChange={(e) => setSetIsPublic(e.target.checked)}
-                    />
-                    <label
-                      htmlFor="isPublic"
-                      style={{ fontSize: "14px", color: "var(--ink)" }}
+                    <div>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "6px",
+                          fontSize: "12px",
+                          letterSpacing: "0.05em",
+                          textTransform: "uppercase",
+                          color: "var(--ink-faint)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Set Title (e.g. 2026 Mock Exam)
+                      </label>
+                      <input
+                        type="text"
+                        value={setTitle}
+                        onChange={(e) => setSetTitle(e.target.value)}
+                        required
+                        className="dash-input"
+                      />
+                    </div>
+                    <div>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: "6px",
+                          fontSize: "12px",
+                          letterSpacing: "0.05em",
+                          textTransform: "uppercase",
+                          color: "var(--ink-faint)",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Start Time (First Exam Access)
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={setAccessibleAt}
+                        onChange={(e) => setSetAccessibleAt(e.target.value)}
+                        required
+                        className="dash-input"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={creatingSet}
+                      className="dash-exam-btn"
+                      style={{
+                        padding: "12px",
+                        marginTop: "12px",
+                        width: "100%",
+                      }}
                     >
-                      Make Public (Live)
-                    </label>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={creatingSet}
-                    style={{
-                      padding: "12px",
-                      background: "var(--accent-light)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      cursor: creatingSet ? "not-allowed" : "pointer",
-                      fontWeight: 500,
-                      transition: "background 0.2s ease",
-                    }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.background = "var(--accent)")
-                    }
-                    onMouseLeave={(e) =>
-                      (e.currentTarget.style.background = "var(--accent-light)")
-                    }
-                  >
-                    {creatingSet ? "Creating..." : "Create Set & Proceed"}
-                  </button>
-                </form>
+                      {creatingSet ? "Creating..." : "Create Set & Proceed"}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           )}
@@ -1007,6 +891,7 @@ export default function AdminDashboard() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  marginBottom: "8px",
                 }}
               >
                 <div
@@ -1020,15 +905,22 @@ export default function AdminDashboard() {
                       border: "1px solid var(--cream-border)",
                       borderRadius: "6px",
                       cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: 500,
                     }}
                   >
                     ← Back
                   </button>
-                  <h2
-                    style={{ fontSize: "20px", margin: 0, color: "var(--ink)" }}
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: "24px",
+                      margin: 0,
+                      color: "var(--ink)",
+                    }}
                   >
                     Managing: {selectedSet.title}
-                  </h2>
+                  </div>
                 </div>
 
                 <button
@@ -1093,323 +985,336 @@ export default function AdminDashboard() {
               </div>
 
               <div
-                style={{
-                  background: "var(--cream-dark)",
-                  padding: "24px",
-                  borderRadius: "10px",
-                  border: "1px solid var(--cream-border)",
-                }}
+                className={
+                  selectedSet.exams?.length < 6 ? "dashboard-split-layout" : ""
+                }
               >
-                <h2
-                  style={{
-                    fontSize: "18px",
-                    marginBottom: "16px",
-                    color: "var(--ink)",
-                  }}
-                >
-                  Exams in this Set ({selectedSet.exams?.length || 0}/6)
-                </h2>
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--ink-muted)",
-                    marginBottom: "16px",
-                  }}
-                >
-                  Drag to re-arrange order. Start times cascade sequentially
-                  (150 mins per exam).
-                </p>
-
                 <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "12px",
-                    marginBottom: "24px",
-                  }}
+                  className={
+                    selectedSet.exams?.length < 6 ? "dashboard-split-left" : ""
+                  }
                 >
-                  {!selectedSet.exams || selectedSet.exams.length === 0 ? (
+                  <div
+                    className="dash-section-label"
+                    style={{ marginBottom: "8px" }}
+                  >
+                    Exams in this Set ({selectedSet.exams?.length || 0}/6)
+                  </div>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--ink-muted)",
+                      marginBottom: "16px",
+                    }}
+                  >
+                    Drag to re-arrange order. Start times cascade sequentially
+                    (150 mins per exam).
+                  </p>
+                  <div className="dash-panel">
                     <div
-                      style={{ color: "var(--ink-muted)", fontSize: "14px" }}
-                    >
-                      No exams uploaded yet.
-                    </div>
-                  ) : (
-                    selectedSet.exams.map((exam: any, idx: number) => (
-                      <div
-                        key={exam.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, idx)}
-                        onDragOver={(e) => handleDragOver(e, idx)}
-                        onDrop={(e) => handleDrop(e, idx)}
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          padding: "12px",
-                          background:
-                            draggedItemIdx === idx
-                              ? "var(--cream-dark)"
-                              : "var(--cream)",
-                          border: "1px solid var(--cream-border)",
-                          borderRadius: "6px",
-                          cursor: "grab",
-                          opacity: draggedItemIdx === idx ? 0.5 : 1,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              color: "var(--ink-faint)",
-                              cursor: "grab",
-                            }}
-                          >
-                            ⋮⋮
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>
-                              {idx + 1}. {exam.title} ({exam.subject_code})
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "12px",
-                                color: "var(--ink-muted)",
-                              }}
-                            >
-                              Unlocks at:{" "}
-                              {new Date(exam.accessible_at).toLocaleString()}
-                            </div>
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                          }}
-                        >
-                          {(() => {
-                            const endTime =
-                              new Date(exam.accessible_at).getTime() +
-                              (exam.duration_minutes || 150) * 60000;
-                            const isClosed = Date.now() > endTime;
-
-                            if (isClosed) {
-                              return (
-                                <button
-                                  onClick={async () => {
-                                    const newStatus = !exam.is_reopened;
-                                    try {
-                                      const { error } = await supabase
-                                        .from("exams")
-                                        .update({ is_reopened: newStatus })
-                                        .eq("id", exam.id);
-
-                                      if (error) throw error;
-
-                                      // Local update for immediate feedback
-                                      const updatedExams =
-                                        selectedSet.exams.map((e: any) =>
-                                          e.id === exam.id
-                                            ? { ...e, is_reopened: newStatus }
-                                            : e,
-                                        );
-                                      setSelectedSet({
-                                        ...selectedSet,
-                                        exams: updatedExams,
-                                      });
-                                    } catch (err) {
-                                      console.error(
-                                        "Failed to toggle reopen status:",
-                                        err,
-                                      );
-                                      alert("Failed to toggle reopen status.");
-                                    }
-                                  }}
-                                  style={{
-                                    fontSize: "12px",
-                                    background: exam.is_reopened
-                                      ? "var(--green-bg)"
-                                      : "var(--cream-dark)",
-                                    color: exam.is_reopened
-                                      ? "var(--green)"
-                                      : "var(--ink-muted)",
-                                    padding: "4px 8px",
-                                    borderRadius: "6px",
-                                    border: `1px solid ${exam.is_reopened ? "var(--green)" : "var(--cream-border)"}`,
-                                    cursor: "pointer",
-                                    transition: "all 0.2s ease",
-                                  }}
-                                  title={
-                                    exam.is_reopened
-                                      ? "Close reopened exam"
-                                      : "Indefinitely reopen exam for late takers"
-                                  }
-                                >
-                                  {exam.is_reopened
-                                    ? "Reopened (Indefinite)"
-                                    : "Reopen for Late Takers"}
-                                </button>
-                              );
-                            }
-                            return null;
-                          })()}
-                          <div
-                            style={{
-                              fontSize: "12px",
-                              background: "var(--accent-bg)",
-                              color: "var(--accent)",
-                              padding: "4px 8px",
-                              borderRadius: "6px",
-                            }}
-                          >
-                            150 mins
-                          </div>
-                          <button
-                            onClick={() => promptDeleteExam(exam)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "var(--red)",
-                              cursor: "pointer",
-                              fontSize: "16px",
-                            }}
-                            title="Delete Exam"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {selectedSet.exams?.length < 6 && (
-                  <>
-                    <h3
-                      style={{
-                        fontSize: "16px",
-                        marginBottom: "12px",
-                        color: "var(--ink)",
-                        borderTop: "1px solid var(--cream-border)",
-                        paddingTop: "16px",
-                      }}
-                    >
-                      Upload Next Exam
-                    </h3>
-                    {uploadMessage && (
-                      <div
-                        style={{
-                          padding: "12px",
-                          marginBottom: "16px",
-                          borderRadius: "6px",
-                          background: uploadMessage.includes("success")
-                            ? "var(--green-bg)"
-                            : "var(--red-bg)",
-                          color: uploadMessage.includes("success")
-                            ? "var(--green)"
-                            : "var(--red)",
-                        }}
-                      >
-                        {uploadMessage}
-                      </div>
-                    )}
-                    <form
-                      onSubmit={handleUpload}
                       style={{
                         display: "flex",
                         flexDirection: "column",
-                        gap: "16px",
                       }}
                     >
-                      <div>
-                        <label
-                          style={{
-                            display: "block",
-                            marginBottom: "4px",
-                            fontSize: "14px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          Exam Title
-                        </label>
-                        <input
-                          type="text"
-                          value={examTitle}
-                          onChange={(e) => setExamTitle(e.target.value)}
-                          required
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--cream-border)",
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label
-                          style={{
-                            display: "block",
-                            marginBottom: "4px",
-                            fontSize: "14px",
-                            color: "var(--ink-muted)",
-                          }}
-                        >
-                          Exam File (.txt)
-                        </label>
-                        <input
-                          id="examFile"
-                          type="file"
-                          accept=".txt"
-                          onChange={handleFileChange}
-                          required
-                          style={{
-                            width: "100%",
-                            padding: "8px 12px",
-                            borderRadius: "6px",
-                            border: "1px solid var(--cream-border)",
-                          }}
-                        />
+                      {!selectedSet.exams || selectedSet.exams.length === 0 ? (
                         <div
                           style={{
-                            fontSize: "12px",
-                            color: "var(--ink-faint)",
-                            marginTop: "4px",
+                            color: "var(--ink-muted)",
+                            fontSize: "14px",
+                            padding: "12px 0",
                           }}
                         >
-                          File must start with a subject code and contain
-                          exactly 100 questions. Appends to the end of the
-                          schedule.
+                          No exams uploaded yet.
                         </div>
+                      ) : (
+                        selectedSet.exams.map((exam: any, idx: number) => (
+                          <div
+                            key={exam.id}
+                            className="dash-exam-row"
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, idx)}
+                            onDragOver={(e) => handleDragOver(e, idx)}
+                            onDrop={(e) => handleDrop(e, idx)}
+                            style={{
+                              padding: "13px 0",
+                              cursor: "grab",
+                              opacity: draggedItemIdx === idx ? 0.4 : 1,
+                              background:
+                                draggedItemIdx === idx
+                                  ? "var(--cream-dark)"
+                                  : "transparent",
+                              transition: "background 0.2s, opacity 0.2s",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                                flexShrink: 0,
+                                whiteSpace: "nowrap",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  color: "var(--ink-faint)",
+                                  cursor: "grab",
+                                }}
+                              >
+                                ⋮⋮
+                              </div>
+                              <div>
+                                <div className="dash-exam-title">
+                                  {idx + 1}. {exam.title} ({exam.subject_code})
+                                </div>
+                                <div className="dash-exam-code">
+                                  Unlocks at:{" "}
+                                  {new Date(
+                                    exam.accessible_at,
+                                  ).toLocaleString()}
+                                </div>
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "12px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  fontSize: "12px",
+                                  background: "var(--accent-bg)",
+                                  color: "var(--accent)",
+                                  padding: "4px 8px",
+                                  borderRadius: "6px",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                150 mins
+                              </div>
+                              {(() => {
+                                const endTime =
+                                  new Date(exam.accessible_at).getTime() +
+                                  (exam.duration_minutes || 150) * 60000;
+                                const isClosed = Date.now() > endTime;
+
+                                if (isClosed) {
+                                  return (
+                                    <button
+                                      onClick={async () => {
+                                        const newStatus = !exam.is_reopened;
+                                        try {
+                                          const { error } = await supabase
+                                            .from("exams")
+                                            .update({ is_reopened: newStatus })
+                                            .eq("id", exam.id);
+
+                                          if (error) throw error;
+
+                                          // Local update for immediate feedback
+                                          const updatedExams =
+                                            selectedSet.exams.map((e: any) =>
+                                              e.id === exam.id
+                                                ? {
+                                                    ...e,
+                                                    is_reopened: newStatus,
+                                                  }
+                                                : e,
+                                            );
+                                          setSelectedSet({
+                                            ...selectedSet,
+                                            exams: updatedExams,
+                                          });
+                                        } catch (err) {
+                                          console.error(
+                                            "Failed to toggle reopen status:",
+                                            err,
+                                          );
+                                          alert(
+                                            "Failed to toggle reopen status.",
+                                          );
+                                        }
+                                      }}
+                                      style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        width: "32px",
+                                        height: "32px",
+                                        background: exam.is_reopened
+                                          ? "var(--green-bg)"
+                                          : "var(--cream-dark)",
+                                        color: exam.is_reopened
+                                          ? "var(--green)"
+                                          : "var(--ink-muted)",
+                                        border: `1px solid ${exam.is_reopened ? "var(--green)" : "var(--cream-border)"}`,
+                                        borderRadius: "6px",
+                                        cursor: "pointer",
+                                        transition: "all 0.2s ease",
+                                        fontSize: "14px",
+                                      }}
+                                      title={
+                                        exam.is_reopened
+                                          ? "Close reopened exam"
+                                          : "Indefinitely reopen exam for late takers"
+                                      }
+                                    >
+                                      ↻
+                                    </button>
+                                  );
+                                }
+                                return null;
+                              })()}
+                              <button
+                                onClick={() => promptDeleteExam(exam)}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: "32px",
+                                  height: "32px",
+                                  background: "var(--red-bg)",
+                                  color: "var(--red)",
+                                  border: "1px solid var(--red)",
+                                  borderRadius: "6px",
+                                  cursor: "pointer",
+                                  fontSize: "14px",
+                                  transition: "all 0.2s ease",
+                                }}
+                                title="Delete Exam"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedSet.exams?.length < 6 && (
+                  <div className="dashboard-split-right">
+                    <div>
+                      <div
+                        className="dash-section-label"
+                        style={{ marginBottom: "8px" }}
+                      >
+                        Upload Next Exam
                       </div>
-                      <button
-                        type="submit"
-                        disabled={uploading}
+                      <p
                         style={{
-                          padding: "12px",
-                          background: "var(--accent)",
-                          color: "white",
-                          border: "none",
-                          borderRadius: "6px",
-                          cursor: uploading ? "not-allowed" : "pointer",
-                          fontWeight: 500,
+                          fontSize: "12px",
+                          color: "var(--ink-muted)",
+                          marginBottom: "16px",
                         }}
                       >
-                        {uploading ? "Uploading..." : "Upload Exam"}
-                      </button>
-                    </form>
-                  </>
+                        Append a subject exam file. Limit 6.
+                      </p>
+                      <div className="dash-panel">
+                        {uploadMessage && (
+                          <div
+                            style={{
+                              padding: "12px",
+                              marginBottom: "16px",
+                              borderRadius: "6px",
+                              background: uploadMessage.includes("success")
+                                ? "var(--green-bg)"
+                                : "var(--red-bg)",
+                              color: uploadMessage.includes("success")
+                                ? "var(--green)"
+                                : "var(--red)",
+                              fontSize: "13px",
+                            }}
+                          >
+                            {uploadMessage}
+                          </div>
+                        )}
+                        <form
+                          onSubmit={handleUpload}
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "16px",
+                          }}
+                        >
+                          <div>
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: "6px",
+                                fontSize: "12px",
+                                letterSpacing: "0.05em",
+                                textTransform: "uppercase",
+                                color: "var(--ink-faint)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Exam Title
+                            </label>
+                            <input
+                              type="text"
+                              value={examTitle}
+                              onChange={(e) => setExamTitle(e.target.value)}
+                              required
+                              className="dash-input"
+                            />
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: "6px",
+                                fontSize: "12px",
+                                letterSpacing: "0.05em",
+                                textTransform: "uppercase",
+                                color: "var(--ink-faint)",
+                                fontWeight: 600,
+                              }}
+                            >
+                              Exam File (.txt)
+                            </label>
+                            <input
+                              id="examFile"
+                              type="file"
+                              accept=".txt"
+                              onChange={handleFileChange}
+                              required
+                              className="dash-input"
+                              style={{ padding: "8px 12px" }}
+                            />
+                            <div
+                              style={{
+                                fontSize: "11px",
+                                color: "var(--ink-faint)",
+                                marginTop: "6px",
+                                lineHeight: 1.4,
+                              }}
+                            >
+                              File must start with a subject code and contain
+                              exactly 100 questions.
+                            </div>
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={uploading}
+                            className="dash-exam-btn"
+                            style={{ padding: "12px", marginTop: "12px" }}
+                          >
+                            {uploading ? "Uploading..." : "Upload Exam"}
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {activeTab === "ANALYTICS" && (
@@ -1506,30 +1411,14 @@ export default function AdminDashboard() {
           ) : (
             <>
               {analyticsExamId === "ALL" && (
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "24px",
-                  }}
-                >
-                  <div
-                    style={{
-                      background: "var(--cream-dark)",
-                      padding: "24px",
-                      borderRadius: "10px",
-                      border: "1px solid var(--cream-border)",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        margin: "0 0 16px 0",
-                        fontSize: "16px",
-                        color: "var(--green)",
-                      }}
+                <div className="dashboard-split-layout">
+                  <div className="dashboard-split-left dash-panel">
+                    <div
+                      className="dash-section-label"
+                      style={{ marginBottom: "16px" }}
                     >
                       Passers ({passers.length})
-                    </h3>
+                    </div>
                     <div
                       style={{
                         fontSize: "12px",
@@ -1576,23 +1465,13 @@ export default function AdminDashboard() {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      background: "var(--cream-dark)",
-                      padding: "24px",
-                      borderRadius: "10px",
-                      border: "1px solid var(--cream-border)",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        margin: "0 0 16px 0",
-                        fontSize: "16px",
-                        color: "var(--ink)",
-                      }}
+                  <div className="dashboard-split-right dash-panel">
+                    <div
+                      className="dash-section-label"
+                      style={{ marginBottom: "16px" }}
                     >
                       Top 10 Highest GWA
-                    </h3>
+                    </div>
                     <div
                       style={{
                         fontSize: "12px",
@@ -1662,158 +1541,189 @@ export default function AdminDashboard() {
               )}
 
               {analyticsExamId !== "ALL" && analyticsExamContent && (
-                <div
-                  style={{
-                    background: "var(--cream-dark)",
-                    padding: "24px",
-                    borderRadius: "10px",
-                    border: "1px solid var(--cream-border)",
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: "0 0 16px 0",
-                      fontSize: "18px",
-                      color: "var(--ink)",
-                    }}
-                  >
-                    Item Analysis
-                  </h3>
+                <div>
                   <div
-                    style={{
-                      fontSize: "13px",
-                      color: "var(--ink-muted)",
-                      marginBottom: "24px",
-                    }}
+                    className="dash-section-label"
+                    style={{ marginBottom: "16px" }}
                   >
-                    Total Students Taken: {analyticsResults.length}
+                    Item Analysis (Students: {analyticsResults.length})
                   </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "16px",
-                    }}
-                  >
-                    {itemAnalysis.map((item: any, idx: number) => (
-                      <div
-                        key={idx}
-                        style={{
-                          padding: "24px",
-                          border: "1px solid var(--cream-border)",
-                          borderRadius: "10px",
-                          background: "var(--cream)",
-                        }}
-                      >
+                  <div className="dash-panel">
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "16px",
+                      }}
+                    >
+                      {itemAnalysis.map((item: any, idx: number) => (
                         <div
+                          key={idx}
                           style={{
-                            fontSize: "14px",
-                            color: "var(--ink-muted)",
-                            marginBottom: "8px",
+                            padding: "24px",
+                            border: "1px solid var(--cream-border)",
+                            borderRadius: "10px",
+                            background: "var(--cream)",
                           }}
                         >
-                          Question {item.questionNum}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: "16px",
-                            color: "var(--ink)",
-                            fontWeight: 500,
-                            marginBottom: "20px",
-                            lineHeight: 1.5,
-                          }}
-                        >
-                          {item.stem}
-                        </div>
+                          <div
+                            style={{
+                              fontSize: "14px",
+                              color: "var(--ink-muted)",
+                              marginBottom: "8px",
+                            }}
+                          >
+                            Question {item.questionNum}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "16px",
+                              color: "var(--ink)",
+                              fontWeight: 500,
+                              marginBottom: "20px",
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {item.stem}
+                          </div>
 
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "12px",
-                          }}
-                        >
-                          {item.options.map((opt: any) => {
-                            const count = item.tally[opt.letter] || 0;
-                            const percent =
-                              analyticsResults.length > 0
-                                ? Math.round(
-                                    (count / analyticsResults.length) * 100,
-                                  )
-                                : 0;
-                            const isCorrect = opt.letter === item.correctLetter;
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "12px",
+                            }}
+                          >
+                            {item.options.map((opt: any) => {
+                              const count = item.tally[opt.letter] || 0;
+                              const percent =
+                                analyticsResults.length > 0
+                                  ? Math.round(
+                                      (count / analyticsResults.length) * 100,
+                                    )
+                                  : 0;
+                              const isCorrect =
+                                opt.letter === item.correctLetter;
 
-                            return (
+                              return (
+                                <div
+                                  key={opt.letter}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    padding: "12px 16px",
+                                    background: isCorrect
+                                      ? "var(--green-bg)"
+                                      : "var(--cream-dark)",
+                                    border: `1px solid ${isCorrect ? "var(--green)" : "var(--cream-border)"}`,
+                                    borderRadius: "6px",
+                                  }}
+                                >
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "16px",
+                                      flex: 1,
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        width: "28px",
+                                        height: "28px",
+                                        borderRadius: "50%",
+                                        border: `1px solid ${isCorrect ? "var(--green)" : "var(--ink-muted)"}`,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: "13px",
+                                        fontWeight: 500,
+                                        color: isCorrect
+                                          ? "var(--green)"
+                                          : "var(--ink-muted)",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      {opt.letter}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "var(--ink)",
+                                        lineHeight: 1.4,
+                                      }}
+                                    >
+                                      {opt.text}
+                                    </div>
+                                  </div>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "flex-end",
+                                      flexShrink: 0,
+                                      marginLeft: "16px",
+                                    }}
+                                  >
+                                    <div
+                                      style={{
+                                        fontWeight: 600,
+                                        color: isCorrect
+                                          ? "var(--green)"
+                                          : "var(--ink)",
+                                      }}
+                                    >
+                                      {count}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "var(--ink-muted)",
+                                      }}
+                                    >
+                                      {percent}%
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+
+                            {item.tally["No Answer"] > 0 && (
                               <div
-                                key={opt.letter}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "space-between",
                                   padding: "12px 16px",
-                                  background: isCorrect
-                                    ? "var(--green-bg)"
-                                    : "var(--cream-dark)",
-                                  border: `1px solid ${isCorrect ? "var(--green)" : "var(--cream-border)"}`,
+                                  background: "var(--cream-dark)",
+                                  border: "1px dashed var(--cream-border)",
                                   borderRadius: "6px",
                                 }}
                               >
                                 <div
                                   style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "16px",
-                                    flex: 1,
+                                    fontSize: "14px",
+                                    color: "var(--ink-muted)",
+                                    fontStyle: "italic",
                                   }}
                                 >
-                                  <div
-                                    style={{
-                                      width: "28px",
-                                      height: "28px",
-                                      borderRadius: "50%",
-                                      border: `1px solid ${isCorrect ? "var(--green)" : "var(--ink-muted)"}`,
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: "13px",
-                                      fontWeight: 500,
-                                      color: isCorrect
-                                        ? "var(--green)"
-                                        : "var(--ink-muted)",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    {opt.letter}
-                                  </div>
-                                  <div
-                                    style={{
-                                      fontSize: "14px",
-                                      color: "var(--ink)",
-                                      lineHeight: 1.4,
-                                    }}
-                                  >
-                                    {opt.text}
-                                  </div>
+                                  No Answer / Skipped
                                 </div>
                                 <div
                                   style={{
                                     display: "flex",
                                     flexDirection: "column",
                                     alignItems: "flex-end",
-                                    flexShrink: 0,
-                                    marginLeft: "16px",
                                   }}
                                 >
                                   <div
                                     style={{
                                       fontWeight: 600,
-                                      color: isCorrect
-                                        ? "var(--green)"
-                                        : "var(--ink)",
+                                      color: "var(--ink-muted)",
                                     }}
                                   >
-                                    {count}
+                                    {item.tally["No Answer"]}
                                   </div>
                                   <div
                                     style={{
@@ -1821,68 +1731,20 @@ export default function AdminDashboard() {
                                       color: "var(--ink-muted)",
                                     }}
                                   >
-                                    {percent}%
+                                    {Math.round(
+                                      (item.tally["No Answer"] /
+                                        analyticsResults.length) *
+                                        100,
+                                    )}
+                                    %
                                   </div>
                                 </div>
                               </div>
-                            );
-                          })}
-
-                          {item.tally["No Answer"] > 0 && (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "12px 16px",
-                                background: "var(--cream-dark)",
-                                border: "1px dashed var(--cream-border)",
-                                borderRadius: "6px",
-                              }}
-                            >
-                              <div
-                                style={{
-                                  fontSize: "14px",
-                                  color: "var(--ink-muted)",
-                                  fontStyle: "italic",
-                                }}
-                              >
-                                No Answer / Skipped
-                              </div>
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  alignItems: "flex-end",
-                                }}
-                              >
-                                <div
-                                  style={{
-                                    fontWeight: 600,
-                                    color: "var(--ink-muted)",
-                                  }}
-                                >
-                                  {item.tally["No Answer"]}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    color: "var(--ink-muted)",
-                                  }}
-                                >
-                                  {Math.round(
-                                    (item.tally["No Answer"] /
-                                      analyticsResults.length) *
-                                      100,
-                                  )}
-                                  %
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

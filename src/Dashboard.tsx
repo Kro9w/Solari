@@ -45,7 +45,20 @@ export default function Dashboard() {
       ]);
 
       const fetchedSets = setsData.data || [];
-      setExamSets(fetchedSets);
+
+      // Strictly sort exams within each set by the admin-defined `accessible_at` time
+      const processedSets = fetchedSets.map((set) => {
+        if (set.exams) {
+          set.exams.sort(
+            (a: any, b: any) =>
+              new Date(a.accessible_at).getTime() -
+              new Date(b.accessible_at).getTime(),
+          );
+        }
+        return set;
+      });
+
+      setExamSets(processedSets);
       setResults(resultsData.data || []);
 
       if (fetchedSets.length > 0) {
@@ -101,7 +114,7 @@ export default function Dashboard() {
         }
       });
 
-      totalGWA = Math.round(gwaSum * (100 / (totalWeight || 100)));
+      totalGWA = Math.round(gwaSum);
     }
   }
 
@@ -113,8 +126,17 @@ export default function Dashboard() {
     const res = targetSetResults.find((r) =>
       r.exam?.subject_code?.startsWith(sub.short),
     );
-    return { short: sub.short, score: res ? res.score : null };
+    const score = res ? res.score : null;
+    const weightedScore =
+      score !== null ? score * ((sub.weight || 0) / 100) : null;
+    return { short: sub.short, score, weightedScore, weight: sub.weight };
   });
+
+  const hasDanger = subjectScores.some((s) => s.score !== null && s.score < 50);
+  const hasWatch = subjectScores.some(
+    (s) => s.score !== null && s.score >= 50 && s.score < 75,
+  );
+  const hasGood = subjectScores.some((s) => s.score !== null && s.score >= 75);
 
   let focusTier: "danger" | "watch" | "good" | "excellent" = "watch";
   let focusMessage = "";
@@ -140,7 +162,7 @@ export default function Dashboard() {
       {/* ── masthead ── */}
       <div className="dash-header">
         <div style={{ position: "relative", zIndex: 2 }}>
-          <div className="dash-eyebrow">CBLEL Dashboard</div>
+          <div className="dash-eyebrow">Exam Dashboard</div>
           <h1 className="dash-heading">Welcome, {displayName}</h1>
           <div className="live-clock" style={{ marginTop: 8 }}>
             <span className="live-clock-dot" />
@@ -304,7 +326,7 @@ export default function Dashboard() {
                   color: "var(--ink)",
                 }}
               >
-                By exam set
+                By Exam Set
               </div>
               <select
                 className="dash-select"
@@ -331,38 +353,55 @@ export default function Dashboard() {
                       {[25, 50, 75, 100].map((pct) => (
                         <div
                           key={pct}
-                          className={`dash-chart-gridline ${pct === 75 ? "pass" : ""}`}
+                          className={`dash-chart-gridline ${pct === 75 ? "pass" : pct === 50 ? "danger" : ""}`}
                           style={{ bottom: `${pct}%` }}
                         >
                           {pct === 75 && (
-                            <span className="dash-chart-gridline-label">
+                            <span className="dash-chart-gridline-label pass">
                               Pass · 75%
+                            </span>
+                          )}
+                          {pct === 50 && (
+                            <span className="dash-chart-gridline-label danger">
+                              Min · 50%
                             </span>
                           )}
                         </div>
                       ))}
                     </div>
                     <div className="dash-chart-bars">
-                      {subjectScores.map(({ short, score }) => (
+                      {subjectScores.map(({ short, score, weightedScore }) => (
                         <div key={short} className="dash-bar-col">
                           {score !== null && (
-                            <div
-                              className={`dash-bar ${
-                                score < 50
-                                  ? "dash-bar-danger"
-                                  : score < 75
-                                    ? "dash-bar-watch"
-                                    : "dash-bar-good"
-                              }`}
-                              style={{ height: `${score}%` }}
-                            />
+                            <>
+                              <div
+                                className="dash-bar dash-bar-raw has-tooltip"
+                                data-tooltip={`Raw: ${score}%`}
+                                style={{ height: `${score}%` }}
+                              />
+                              <div
+                                className={`dash-bar dash-bar-weighted has-tooltip ${
+                                  score < 50
+                                    ? "dash-bar-danger"
+                                    : score < 75
+                                      ? "dash-bar-watch"
+                                      : "dash-bar-good"
+                                }`}
+                                data-tooltip={
+                                  weightedScore !== null
+                                    ? `Weighted: ${weightedScore.toFixed(1).replace(/\.0$/, "")}%`
+                                    : undefined
+                                }
+                                style={{ height: `${weightedScore}%` }}
+                              />
+                            </>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="dash-chart-labels">
-                    {subjectScores.map(({ short, score }) => (
+                    {subjectScores.map(({ short, score, weightedScore }) => (
                       <div key={short} className="dash-bar-col">
                         <div
                           className="dash-bar-label"
@@ -376,10 +415,104 @@ export default function Dashboard() {
                           {short}
                         </div>
                         <div className="dash-bar-score">
-                          {score !== null ? `${score}%` : "—"}
+                          {weightedScore !== null
+                            ? `${weightedScore.toFixed(1).replace(/\.0$/, "")}%`
+                            : "—"}
                         </div>
                       </div>
                     ))}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "16px",
+                      marginTop: "16px",
+                      fontSize: "11px",
+                      color: "var(--ink-muted)",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: "10px",
+                          height: "10px",
+                          background: "var(--cream-border)",
+                          borderRadius: "2px",
+                        }}
+                      />
+                      Raw Score
+                    </div>
+
+                    {hasGood && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            background: "var(--green)",
+                            borderRadius: "2px",
+                          }}
+                        />
+                        Pass (≥75%)
+                      </div>
+                    )}
+
+                    {hasWatch && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            background: "var(--accent)",
+                            borderRadius: "2px",
+                          }}
+                        />
+                        Watch (50-74%)
+                      </div>
+                    )}
+
+                    {hasDanger && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: "10px",
+                            height: "10px",
+                            background: "var(--red)",
+                            borderRadius: "2px",
+                          }}
+                        />
+                        Danger (&lt;50%)
+                      </div>
+                    )}
                   </div>
                 </div>
 
