@@ -1240,6 +1240,36 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   text-decoration: underline;
 }
 
+/* ── Modal (Forgot Password) ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 26, 23, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--cream);
+  border: 1px solid var(--cream-border);
+  border-radius: var(--radius-sm);
+  padding: 40px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  animation: authEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 30px 24px;
+  }
+}
+
 @media (max-width: 768px) {
   .show-on-mobile-flex {
     display: flex !important;
