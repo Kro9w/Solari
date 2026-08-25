@@ -1,9 +1,124 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 
+function MobileGridModal({
+  isOpen,
+  onClose,
+  session,
+  userName,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  session: any;
+  userName: string;
+}) {
+  if (!isOpen) return null;
+
+  const totalQuestions = session.state?.questions?.length || 100;
+  const answers = session.state?.answers || {};
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          background: "var(--cream)",
+          padding: "24px",
+          borderRadius: "10px",
+          border: "1px solid var(--cream-border)",
+          width: "100%",
+          maxWidth: "400px",
+          boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: "18px",
+              fontFamily: "var(--font-display)",
+              color: "var(--ink)",
+            }}
+          >
+            {userName}'s Progress
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: "20px",
+              cursor: "pointer",
+              color: "var(--ink-muted)",
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(10, 1fr)",
+            gap: "6px",
+          }}
+        >
+          {Array.from({ length: totalQuestions }).map((_, i) => {
+            const hasAnswer = !!answers[i];
+            return (
+              <div
+                key={i}
+                style={{
+                  aspectRatio: "1/1",
+                  background: hasAnswer ? "var(--accent)" : "var(--cream-dark)",
+                  border: `1px solid ${hasAnswer ? "var(--accent-light)" : "var(--cream-border)"}`,
+                  borderRadius: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "10px",
+                  color: hasAnswer ? "var(--cream)" : "var(--ink-muted)",
+                  fontWeight: hasAnswer ? 600 : 400,
+                }}
+              >
+                {i + 1}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LiveFeedback() {
   const [sessions, setSessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMobileSession, setSelectedMobileSession] = useState<
+    any | null
+  >(null);
 
   const fetchSessions = async () => {
     setLoading(true);
@@ -136,12 +251,10 @@ export default function LiveFeedback() {
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
             {(examSessions as any[]).map((s: any) => {
-              const answersCount = s.state?.answers
-                ? Object.keys(s.state.answers).length
-                : 0;
+              const answers = s.state?.answers || {};
+              const answersCount = Object.keys(answers).length;
               const totalQuestions = s.state?.questions?.length || 100;
-              const progressPercent =
-                Math.round((answersCount / totalQuestions) * 100) || 0;
+              const userName = s.user_name || "Unknown Student";
 
               return (
                 <div
@@ -156,7 +269,7 @@ export default function LiveFeedback() {
                     border: "1px solid var(--cream-border)",
                   }}
                 >
-                  <div style={{ flex: 1 }}>
+                  <div style={{ flex: "0 0 auto", marginRight: "24px" }}>
                     <div
                       style={{
                         fontWeight: 600,
@@ -164,51 +277,72 @@ export default function LiveFeedback() {
                         marginBottom: "4px",
                       }}
                     >
-                      {s.user_name || "Unknown Student"}
+                      {userName}
                     </div>
                     <div
                       style={{ fontSize: "12px", color: "var(--ink-muted)" }}
                     >
-                      Last updated:{" "}
-                      {new Date(s.updated_at).toLocaleTimeString()}
+                      {answersCount} / {totalQuestions} answered
                     </div>
                   </div>
+
+                  {/* Desktop Grid */}
                   <div
+                    className="hide-on-mobile"
                     style={{
-                      width: "200px",
+                      flex: 1,
                       display: "flex",
-                      flexDirection: "column",
-                      alignItems: "flex-end",
-                      gap: "6px",
+                      justifyContent: "flex-end",
                     }}
                   >
                     <div
                       style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
+                        display: "grid",
+                        gridTemplateColumns: "repeat(25, 12px)",
+                        gridTemplateRows: "repeat(4, 12px)",
+                        gap: "3px",
+                      }}
+                    >
+                      {Array.from({ length: totalQuestions }).map((_, i) => {
+                        const hasAnswer = !!answers[i];
+                        return (
+                          <div
+                            key={i}
+                            title={`Q${i + 1}`}
+                            style={{
+                              width: "12px",
+                              height: "12px",
+                              background: hasAnswer
+                                ? "var(--accent)"
+                                : "var(--cream-border)",
+                              borderRadius: "2px",
+                              opacity: hasAnswer ? 1 : 0.4,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Mobile Button */}
+                  <div
+                    className="show-on-mobile-flex"
+                    style={{ display: "none" }}
+                  >
+                    <button
+                      onClick={() => setSelectedMobileSession(s)}
+                      style={{
+                        padding: "6px 12px",
+                        background: "var(--cream)",
+                        border: "1px solid var(--cream-border)",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        cursor: "pointer",
                         color: "var(--ink)",
                       }}
                     >
-                      {answersCount} / {totalQuestions} answered
-                    </div>
-                    <div
-                      style={{
-                        width: "100%",
-                        height: "6px",
-                        background: "var(--cream-border)",
-                        borderRadius: "3px",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <div
-                        style={{
-                          width: `${progressPercent}%`,
-                          height: "100%",
-                          background: "var(--accent)",
-                          transition: "width 0.3s ease",
-                        }}
-                      />
-                    </div>
+                      View Grid
+                    </button>
                   </div>
                 </div>
               );
@@ -216,6 +350,13 @@ export default function LiveFeedback() {
           </div>
         </div>
       ))}
+
+      <MobileGridModal
+        isOpen={!!selectedMobileSession}
+        onClose={() => setSelectedMobileSession(null)}
+        session={selectedMobileSession}
+        userName={selectedMobileSession?.user_name || "Unknown Student"}
+      />
     </div>
   );
 }

@@ -1173,3 +1173,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .auth-link:hover {
   text-decoration: underline;
 }
+
+@media (max-width: 768px) {
+  .show-on-mobile-flex {
+    display: flex !important;
+  }
+}
