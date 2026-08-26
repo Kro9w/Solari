@@ -224,8 +224,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
             secondsUntilEnd,
             standardDurationSeconds,
           );
-        } else if (now > endTime) {
-          setIsLateTaker(true);
         }
 
         let loadedQuestions: Question[] | null = null;
@@ -368,12 +366,14 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         setAnswers(loadedAnswers);
         setBookmarks(loadedBookmarks);
 
-        if (now > endTime) {
-          // Late taker logic
+        if (data.is_reopened) {
+          setIsLateTaker(true);
+          // Late taker logic for reopened exams
           if (!loadedStartedAt) {
-            // First time loading for late taker
-            loadedStartedAt = new Date().toISOString();
-            loadedElapsed = 0; // Initialize elapsed
+            // First time loading for late taker or old session fallback
+            loadedStartedAt = new Date(
+              now.getTime() - loadedElapsed * 1000,
+            ).toISOString();
           } else {
             // Returning late taker, calculate elapsed based on started_at
             const startedAtTime = new Date(loadedStartedAt).getTime();

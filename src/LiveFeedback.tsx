@@ -17,7 +17,6 @@ function MobileGridModal({
 
   const totalQuestions = session.state?.questions?.length || 100;
   const answers = session.state?.answers || {};
-  const current = session.state?.current;
 
   return (
     <div className="modal-overlay">
@@ -33,11 +32,10 @@ function MobileGridModal({
           <div className="feed-grid-lg">
             {Array.from({ length: totalQuestions }).map((_, i) => {
               const hasAnswer = !!answers[i];
-              const isCurrent = current === i;
               return (
                 <div
                   key={i}
-                  className={`feed-cell-lg${isCurrent ? " current" : hasAnswer ? " answered" : ""}`}
+                  className={`feed-cell-lg${hasAnswer ? " answered" : ""}`}
                 >
                   {i + 1}
                 </div>
@@ -57,14 +55,15 @@ export default function LiveFeedback() {
     any | null
   >(null);
   const [now, setNow] = useState(new Date());
+  const [isCleaning, setIsCleaning] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchSessions = async (isInitial = false) => {
-    if (isInitial) setLoading(true);
+  const fetchSessions = async (isBackground = false) => {
+    if (!isBackground) setLoading(true);
     try {
       const { data, error } = await supabase
         .from("exam_sessions")
@@ -78,12 +77,108 @@ export default function LiveFeedback() {
     } catch (err) {
       console.error("Failed to fetch sessions:", err);
     } finally {
-      if (isInitial) setLoading(false);
+      if (!isBackground) setLoading(false);
+    }
+  };
+
+  const handleCleanupExpired = async () => {
+    if (isCleaning) return;
+    setIsCleaning(true);
+
+    try {
+      let processedCount = 0;
+      for (const session of sessions) {
+        const exam = session.exam;
+        if (!exam) continue;
+
+        let isExpired = false;
+
+        if (!exam.is_reopened && exam.accessible_at) {
+          const accessTime = new Date(exam.accessible_at);
+          const endTime = new Date(
+            accessTime.getTime() + (exam.duration_minutes || 150) * 60000,
+          );
+          if (now > endTime) isExpired = true;
+        } else if (exam.is_reopened && session.state?.started_at) {
+          const startedAtTime = new Date(session.state.started_at);
+          const standardDurationSeconds = (exam.duration_minutes || 150) * 60;
+          const elapsedSeconds = Math.max(
+            0,
+            Math.floor((now.getTime() - startedAtTime.getTime()) / 1000),
+          );
+          if (elapsedSeconds >= standardDurationSeconds) isExpired = true;
+        }
+
+        if (isExpired) {
+          const state = session.state || {};
+          const questions = state.questions || [];
+          const answers = state.answers || {};
+          const elapsed = state.elapsed || (exam.duration_minutes || 150) * 60;
+
+          if (questions.length > 0) {
+            const correctCount = questions.filter((q: any, i: number) => {
+              const chosen = answers[i];
+              return (
+                chosen &&
+                q.options.find((o: any) => o.letter === chosen)?.correct
+              );
+            }).length;
+
+            const score = Math.round((correctCount / questions.length) * 100);
+
+            const originalIndexedAnswers: Record<number, string> = {};
+            Object.keys(answers).forEach((shuffledIdx) => {
+              const q = questions[parseInt(shuffledIdx, 10)];
+              if (q) {
+                originalIndexedAnswers[q.originalIndex] =
+                  answers[parseInt(shuffledIdx, 10)];
+              }
+            });
+
+            const newResult = {
+              user_id: session.user_id,
+              user_name: session.user_name || "Unknown Student",
+              exam_id: session.exam_id,
+              score,
+              correct_count: correctCount,
+              total_count: questions.length,
+              answers: originalIndexedAnswers,
+              time_taken: elapsed,
+            };
+
+            const { data: existing } = await supabase
+              .from("exam_results")
+              .select("id")
+              .eq("user_id", session.user_id)
+              .eq("exam_id", session.exam_id)
+              .maybeSingle();
+            if (!existing) {
+              await supabase.from("exam_results").insert(newResult);
+            }
+
+            await supabase.from("exam_sessions").delete().eq("id", session.id);
+            processedCount++;
+          }
+        }
+      }
+      if (processedCount > 0) {
+        alert(
+          `Successfully cleaned up and submitted ${processedCount} expired session(s).`,
+        );
+        fetchSessions(true);
+      } else {
+        alert("No expired sessions found to clean up.");
+      }
+    } catch (err) {
+      console.error("Cleanup failed:", err);
+      alert("An error occurred during cleanup.");
+    } finally {
+      setIsCleaning(false);
     }
   };
 
   useEffect(() => {
-    fetchSessions(true);
+    fetchSessions();
   }, []);
 
   if (loading) {
@@ -97,7 +192,7 @@ export default function LiveFeedback() {
         <p className="feed-empty-text">
           There are no active exam sessions right now.
         </p>
-        <button className="dash-exam-btn" onClick={() => fetchSessions(false)}>
+        <button className="dash-exam-btn" onClick={() => fetchSessions(true)}>
           Refresh Feed
         </button>
       </div>
@@ -137,9 +232,23 @@ export default function LiveFeedback() {
           <div className="dash-eyebrow">Real-Time Monitoring</div>
           <h2 className="dash-set-title">Live Exam Sessions</h2>
         </div>
-        <button className="dash-exam-btn" onClick={() => fetchSessions(false)}>
-          Refresh Feed
-        </button>
+        <div style={{ display: "flex", gap: "12px" }}>
+          <button
+            className="dash-exam-btn"
+            style={{
+              background: "transparent",
+              color: "var(--ink)",
+              border: "1px solid var(--cream-border)",
+            }}
+            onClick={handleCleanupExpired}
+            disabled={isCleaning}
+          >
+            {isCleaning ? "Cleaning..." : "Clean Up Expired"}
+          </button>
+          <button className="dash-exam-btn" onClick={() => fetchSessions(true)}>
+            Refresh Feed
+          </button>
+        </div>
       </div>
 
       {Object.values(grouped).map((groupInfo: any) => {
@@ -263,12 +372,11 @@ export default function LiveFeedback() {
                       <div className="feed-grid">
                         {Array.from({ length: totalQuestions }).map((_, i) => {
                           const hasAnswer = !!answers[i];
-                          const isCurrent = s.state?.current === i;
                           return (
                             <div
                               key={i}
                               title={`Q${i + 1}`}
-                              className={`feed-cell${isCurrent ? " current" : hasAnswer ? " answered" : ""}`}
+                              className={`feed-cell${hasAnswer ? " answered" : ""}`}
                             />
                           );
                         })}

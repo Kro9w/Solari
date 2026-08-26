@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [selectedResultForModal, setSelectedResultForModal] = useState<
     any | null
   >(null);
+  const [showMistakesOnly, setShowMistakesOnly] = useState(false);
   const [clockNow, setClockNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -672,53 +673,19 @@ export default function Dashboard() {
 
       {selectedResultForModal && (
         <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(28,26,23,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            padding: "24px",
+          className="modal-overlay"
+          style={{ backdropFilter: "blur(4px)" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setSelectedResultForModal(null);
+              setShowMistakesOnly(false);
+            }
           }}
         >
-          <div
-            style={{
-              background: "var(--cream)",
-              borderRadius: "10px",
-              border: "1px solid var(--cream-border)",
-              maxWidth: "600px",
-              width: "100%",
-              maxHeight: "85vh",
-              display: "flex",
-              flexDirection: "column",
-              boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "20px 24px",
-                borderBottom: "1px solid var(--cream-border)",
-              }}
-            >
+          <div className="modal-card" style={{ maxWidth: "600px" }}>
+            <div className="modal-header">
               <div>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: "20px",
-                    fontFamily: "var(--font-display)",
-                    color: "var(--ink)",
-                  }}
-                >
-                  Exam Summary
-                </h3>
+                <h3 className="modal-title">Exam Summary</h3>
                 <div
                   style={{
                     fontSize: "13px",
@@ -726,37 +693,50 @@ export default function Dashboard() {
                     marginTop: "4px",
                   }}
                 >
-                  {selectedResultForModal.exam?.title} (
-                  {selectedResultForModal.exam?.subject_code})
+                  {selectedResultForModal.exam?.subject_code}
                 </div>
               </div>
-              <button
-                onClick={() => setSelectedResultForModal(null)}
+
+              <div
                 style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "24px",
-                  cursor: "pointer",
-                  color: "var(--ink-muted)",
-                  lineHeight: 1,
-                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
-                &times;
-              </button>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--ink-muted)",
+                    fontWeight: "500",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  Viewing:
+                </span>
+                <button
+                  onClick={() => setShowMistakesOnly(!showMistakesOnly)}
+                  style={{
+                    background: "var(--cream)",
+                    border: "1px solid var(--cream-border)",
+                    boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                    color: showMistakesOnly ? "var(--red)" : "var(--ink)",
+                    padding: "4px 12px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                    minWidth: "75px",
+                  }}
+                >
+                  {showMistakesOnly ? "Mistakes" : "All"}
+                </button>
+              </div>
             </div>
 
-            <div
-              style={{
-                flex: 1,
-                overflowY: "auto",
-                scrollbarGutter: "stable",
-                padding: "24px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-              }}
-            >
+            <div className="modal-body" style={{ gap: "16px" }}>
               {(() => {
                 const examContent = selectedResultForModal.exam?.file_content;
                 if (!examContent)
@@ -774,6 +754,10 @@ export default function Dashboard() {
                   const correctOption = q.options.find((o: any) => o.correct);
                   const isCorrectlyAnswered =
                     userAnswer === correctOption?.letter;
+
+                  if (showMistakesOnly && isCorrectlyAnswered) {
+                    return null;
+                  }
 
                   return (
                     <div
