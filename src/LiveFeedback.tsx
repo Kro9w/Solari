@@ -17,6 +17,7 @@ function MobileGridModal({
 
   const totalQuestions = session.state?.questions?.length || 100;
   const answers = session.state?.answers || {};
+  const current = session.state?.current;
 
   return (
     <div className="modal-overlay">
@@ -32,10 +33,11 @@ function MobileGridModal({
           <div className="feed-grid-lg">
             {Array.from({ length: totalQuestions }).map((_, i) => {
               const hasAnswer = !!answers[i];
+              const isCurrent = current === i;
               return (
                 <div
                   key={i}
-                  className={`feed-cell-lg${hasAnswer ? " answered" : ""}`}
+                  className={`feed-cell-lg${isCurrent ? " current" : hasAnswer ? " answered" : ""}`}
                 >
                   {i + 1}
                 </div>
@@ -61,8 +63,8 @@ export default function LiveFeedback() {
     return () => clearInterval(interval);
   }, []);
 
-  const fetchSessions = async () => {
-    setLoading(true);
+  const fetchSessions = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const { data, error } = await supabase
         .from("exam_sessions")
@@ -76,12 +78,12 @@ export default function LiveFeedback() {
     } catch (err) {
       console.error("Failed to fetch sessions:", err);
     } finally {
-      setLoading(false);
+      if (isInitial) setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSessions();
+    fetchSessions(true);
   }, []);
 
   if (loading) {
@@ -95,7 +97,7 @@ export default function LiveFeedback() {
         <p className="feed-empty-text">
           There are no active exam sessions right now.
         </p>
-        <button className="dash-exam-btn" onClick={fetchSessions}>
+        <button className="dash-exam-btn" onClick={() => fetchSessions(false)}>
           Refresh Feed
         </button>
       </div>
@@ -135,7 +137,7 @@ export default function LiveFeedback() {
           <div className="dash-eyebrow">Real-Time Monitoring</div>
           <h2 className="dash-set-title">Live Exam Sessions</h2>
         </div>
-        <button className="dash-exam-btn" onClick={fetchSessions}>
+        <button className="dash-exam-btn" onClick={() => fetchSessions(false)}>
           Refresh Feed
         </button>
       </div>
@@ -261,11 +263,12 @@ export default function LiveFeedback() {
                       <div className="feed-grid">
                         {Array.from({ length: totalQuestions }).map((_, i) => {
                           const hasAnswer = !!answers[i];
+                          const isCurrent = s.state?.current === i;
                           return (
                             <div
                               key={i}
                               title={`Q${i + 1}`}
-                              className={`feed-cell${hasAnswer ? " answered" : ""}`}
+                              className={`feed-cell${isCurrent ? " current" : hasAnswer ? " answered" : ""}`}
                             />
                           );
                         })}

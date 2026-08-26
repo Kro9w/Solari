@@ -579,15 +579,17 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
       ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
       : "Student";
 
-    // Re-map answers from shuffled index to original index for item analysis
-    const originalIndexedAnswers: Record<number, string> = {};
-    Object.keys(answers).forEach((shuffledIdx) => {
-      const q = questions[parseInt(shuffledIdx, 10)];
-      originalIndexedAnswers[q.originalIndex] =
-        answers[parseInt(shuffledIdx, 10)];
-    });
-
     try {
+      // Re-map answers from shuffled index to original index for item analysis
+      const originalIndexedAnswers: Record<number, string> = {};
+      Object.keys(answers).forEach((shuffledIdx) => {
+        const q = questions[parseInt(shuffledIdx, 10)];
+        if (q) {
+          originalIndexedAnswers[q.originalIndex] =
+            answers[parseInt(shuffledIdx, 10)];
+        }
+      });
+
       // First check if an existing result exists to prevent duplicates entirely
       const { data: existingResult, error: selectError } = await supabase
         .from("exam_results")

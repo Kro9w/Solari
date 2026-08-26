@@ -2272,6 +2272,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 1;
 }
 
+.feed-cell.current {
+  background: var(--green);
+  opacity: 1;
+}
+
 .feed-grid-lg {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -2294,6 +2299,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .feed-cell-lg.answered {
   background: var(--accent);
   border-color: var(--accent-light);
+  color: var(--cream);
+  font-weight: 600;
+}
+
+.feed-cell-lg.current {
+  background: var(--green);
+  border-color: var(--green);
   color: var(--cream);
   font-weight: 600;
 }
