@@ -16,6 +16,7 @@ export type Question = {
   explanation?: string;
 };
 
+// item parser
 export function parseExamMetadata(
   raw: string,
 ): { code: string; durationSeconds?: number } | null {
@@ -172,8 +173,22 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
   useEffect(() => {
     async function loadExam() {
-      if (!examId) return;
+      if (!examId || !user?.id) return;
       try {
+        // First check if user has already submitted this exam
+        const { data: existingResult, error: existingResultError } =
+          await supabase
+            .from("exam_results")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("exam_id", examId)
+            .maybeSingle();
+
+        if (existingResultError) throw existingResultError;
+        if (existingResult) {
+          throw new Error("You have already completed this exam.");
+        }
+
         const { data, error } = await supabase
           .from("exams")
           .select("*")
@@ -800,6 +815,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         </div>
 
+        {/* Scrollable Question Content */}
         <div
           style={{
             flex: 1,
@@ -818,6 +834,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               paddingBottom: "24px",
             }}
           >
+            {/* Bookmarks */}
             <div
               style={{
                 display: "flex",
@@ -847,6 +864,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               </button>
             </div>
 
+            {/* Question Card */}
             <div
               style={{
                 background: "var(--cream-dark)",
@@ -906,6 +924,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               </div>
             </div>
 
+            {/* Options */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -967,6 +986,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         </div>
 
+        {/* Bookmarks Modal */}
         {showBookmarksModal && (
           <div
             style={{
@@ -1090,6 +1110,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
+        {/* Submit Confirmation Modal */}
         {showSubmitModal && (
           <div
             style={{
@@ -1220,6 +1241,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
+        {/* Connection Error Submission Modal */}
         {submitError && (
           <div
             style={{
@@ -1290,6 +1312,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
+        {/* Bottom Navigation */}
         <div
           style={{
             padding: "16px 24px",
