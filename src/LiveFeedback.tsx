@@ -32,11 +32,15 @@ function MobileGridModal({
           <div className="feed-grid-lg">
             {Array.from({ length: totalQuestions }).map((_, i) => {
               const hasAnswer = !!answers[i];
+              const isCurrent = session.state?.current === i;
+              let className = "feed-cell-lg";
+              if (isCurrent) {
+                className += " current";
+              } else if (hasAnswer) {
+                className += " answered";
+              }
               return (
-                <div
-                  key={i}
-                  className={`feed-cell-lg${hasAnswer ? " answered" : ""}`}
-                >
+                <div key={i} className={className}>
                   {i + 1}
                 </div>
               );
@@ -372,11 +376,18 @@ export default function LiveFeedback() {
                       <div className="feed-grid">
                         {Array.from({ length: totalQuestions }).map((_, i) => {
                           const hasAnswer = !!answers[i];
+                          const isCurrent = s.state?.current === i;
+                          let className = "feed-cell";
+                          if (isCurrent) {
+                            className += " current";
+                          } else if (hasAnswer) {
+                            className += " answered";
+                          }
                           return (
                             <div
                               key={i}
                               title={`Q${i + 1}`}
-                              className={`feed-cell${hasAnswer ? " answered" : ""}`}
+                              className={className}
                             />
                           );
                         })}
