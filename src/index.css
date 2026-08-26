@@ -2066,6 +2066,67 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 8px;
 }
 
+/* 4-column variant of dash-stats-row, used in the analytics/item-analysis
+   summary bars. Falls back to 2 columns on narrow screens. */
+.dash-stats-row-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 640px) {
+  .dash-stats-row-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Difficulty badges for item analysis */
+.dash-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 4px 11px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dash-badge-easy {
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.dash-badge-moderate {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.dash-badge-hard {
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+/* Mini progress bar under each item-analysis option, showing the share of
+   students who picked it */
+.dash-option-bar-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--cream-border);
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.dash-option-bar-fill {
+  height: 100%;
+  background: var(--ink-faint);
+  transition: width 0.3s ease;
+}
+
+.dash-option-row.correct .dash-option-bar-fill {
+  background: var(--green);
+}
+
 .dash-question-stem {
   font-size: 15px;
   color: var(--ink);

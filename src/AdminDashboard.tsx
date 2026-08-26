@@ -108,6 +108,17 @@ export default function AdminDashboard() {
   const [analyticsExamContent, setAnalyticsExamContent] = useState<any | null>(
     null,
   );
+  // Sub-view within a single exam: item-level breakdown vs. ranked scores
+  const [examSubView, setExamSubView] = useState<"ITEM_ANALYSIS" | "SCORES">(
+    "ITEM_ANALYSIS",
+  );
+  const [itemSortMode, setItemSortMode] = useState<"ORDER" | "DIFFICULTY">(
+    "ORDER",
+  );
+  const [scoreSortMode, setScoreSortMode] = useState<"SCORE" | "TIME">(
+    "SCORE",
+  );
+  const [scoreSearch, setScoreSearch] = useState("");
 
   useEffect(() => {
     fetchExamSets();
@@ -468,7 +479,13 @@ export default function AdminDashboard() {
 
   const getPassersAndTop10 = () => {
     if (!analyticsSetId || analyticsResults.length === 0)
-      return { top10: [], passers: [] };
+      return {
+        top10: [],
+        passers: [],
+        totalStudents: 0,
+        averageGwa: 0,
+        highestGwa: 0,
+      };
 
     const userMap: Record<
       string,
@@ -515,12 +532,39 @@ export default function AdminDashboard() {
 
     const top10 = studentStats.slice(0, 10);
     const passers = studentStats.filter((s) => s.isPasser);
+    const totalStudents = studentStats.length;
+    const averageGwa = totalStudents
+      ? Math.round(
+          studentStats.reduce((sum, s) => sum + s.gwa, 0) / totalStudents,
+        )
+      : 0;
+    const highestGwa = totalStudents ? studentStats[0].gwa : 0;
 
-    return { top10, passers };
+    return { top10, passers, totalStudents, averageGwa, highestGwa };
+  };
+
+  // Classifies an item's difficulty from its correct-answer rate (p-value)
+  const getDifficultyTier = (pValue: number) => {
+    if (pValue >= 0.75) return "EASY";
+    if (pValue >= 0.5) return "MODERATE";
+    return "HARD";
   };
 
   const getItemAnalysis = () => {
     if (!analyticsExamContent || analyticsResults.length === 0) return [];
+
+    // Split respondents into upper/lower ~27% by overall score to compute a
+    // discrimination index per item (how well the item separates strong from
+    // weak performers) alongside the plain difficulty (p-value).
+    const byScoreDesc = [...analyticsResults].sort(
+      (a, b) => (b.score ?? 0) - (a.score ?? 0),
+    );
+    const groupSize = Math.max(
+      1,
+      Math.round(byScoreDesc.length * 0.27),
+    );
+    const upperGroup = byScoreDesc.slice(0, groupSize);
+    const lowerGroup = byScoreDesc.slice(-groupSize);
 
     return analyticsExamContent.map((q: any, idx: number) => {
       const tally: Record<string, number> = {
@@ -538,19 +582,97 @@ export default function AdminDashboard() {
         else tally["No Answer"]++;
       });
 
+      const correctLetter = q.options.find((o: any) => o.correct)?.letter || "?";
+      const correctCount = tally[correctLetter] || 0;
+      const difficulty =
+        analyticsResults.length > 0
+          ? correctCount / analyticsResults.length
+          : 0;
+
+      const upperCorrect = upperGroup.filter(
+        (r) => r.answers[idx] === correctLetter,
+      ).length;
+      const lowerCorrect = lowerGroup.filter(
+        (r) => r.answers[idx] === correctLetter,
+      ).length;
+      const discrimination =
+        groupSize > 0 ? (upperCorrect - lowerCorrect) / groupSize : 0;
+
       return {
         questionNum: q.number,
         stem: q.stem,
         options: q.options,
         tally,
-        correctLetter: q.options.find((o: any) => o.correct)?.letter || "?",
+        correctLetter,
+        difficulty,
+        difficultyTier: getDifficultyTier(difficulty),
+        discrimination,
       };
     });
   };
 
+  const getScoreRankings = () => {
+    if (analyticsExamId === "ALL" || analyticsResults.length === 0) return [];
+
+    const rows = analyticsResults.map((r) => ({
+      id: r.id,
+      name: r.user_name || "Unknown",
+      score: r.score ?? 0,
+      correct: r.correct_count ?? 0,
+      total: r.total_count ?? 0,
+      time: r.time_taken ?? 0,
+    }));
+
+    rows.sort((a, b) =>
+      scoreSortMode === "SCORE"
+        ? b.score - a.score || a.time - b.time
+        : a.time - b.time || b.score - a.score,
+    );
+
+    // Standard competition ranking (ties share a rank) — only meaningful
+    // when sorted by score, since "rank" is a scoring concept.
+    let rank = 0;
+    let lastScore: number | null = null;
+    const ranked = rows.map((row, i) => {
+      if (row.score !== lastScore) {
+        rank = i + 1;
+        lastScore = row.score;
+      }
+      return { ...row, rank };
+    });
+
+    if (!scoreSearch.trim()) return ranked;
+    const q = scoreSearch.trim().toLowerCase();
+    return ranked.filter((r) => r.name.toLowerCase().includes(q));
+  };
+
   const currentSet = examSets.find((s) => s.id === analyticsSetId);
-  const { top10, passers } = getPassersAndTop10();
-  const itemAnalysis = getItemAnalysis();
+  const currentExam = currentSet?.exams?.find(
+    (e: any) => e.id === analyticsExamId,
+  );
+  const { top10, passers, totalStudents, averageGwa, highestGwa } =
+    getPassersAndTop10();
+  const itemAnalysisRaw = getItemAnalysis();
+  const itemAnalysis =
+    itemSortMode === "DIFFICULTY"
+      ? [...itemAnalysisRaw].sort((a, b) => a.difficulty - b.difficulty)
+      : itemAnalysisRaw;
+  const flaggedItems = itemAnalysisRaw.filter(
+    (i: any) => i.difficultyTier === "HARD",
+  );
+  const scoreRankings = getScoreRankings();
+  const examScoreStats = (() => {
+    if (analyticsExamId === "ALL" || analyticsResults.length === 0)
+      return { average: 0, highest: 0, lowest: 0 };
+    const scores = analyticsResults.map((r) => r.score ?? 0);
+    return {
+      average: Math.round(
+        scores.reduce((a, b) => a + b, 0) / scores.length,
+      ),
+      highest: Math.max(...scores),
+      lowest: Math.min(...scores),
+    };
+  })();
 
   return (
     <div className="dash-shell">
@@ -1073,6 +1195,8 @@ export default function AdminDashboard() {
                   onChange={(e) => {
                     setAnalyticsSetId(e.target.value);
                     setAnalyticsExamId("ALL");
+                    setExamSubView("ITEM_ANALYSIS");
+                    setScoreSearch("");
                   }}
                   style={{ width: "100%" }}
                 >
@@ -1093,7 +1217,11 @@ export default function AdminDashboard() {
                 <select
                   className="dash-select"
                   value={analyticsExamId}
-                  onChange={(e) => setAnalyticsExamId(e.target.value)}
+                  onChange={(e) => {
+                    setAnalyticsExamId(e.target.value);
+                    setExamSubView("ITEM_ANALYSIS");
+                    setScoreSearch("");
+                  }}
                   disabled={!currentSet}
                   style={{ width: "100%" }}
                 >
@@ -1102,7 +1230,7 @@ export default function AdminDashboard() {
                   </option>
                   {currentSet?.exams?.map((e: any) => (
                     <option key={e.id} value={e.id}>
-                      Item Analysis: {e.title}
+                      {e.title} ({e.subject_code})
                     </option>
                   ))}
                 </select>
@@ -1115,204 +1243,512 @@ export default function AdminDashboard() {
           ) : (
             <>
               {analyticsExamId === "ALL" && (
-                <div className="dashboard-split-layout">
-                  <div className="dashboard-split-left dash-panel">
-                    <div
-                      className="dash-section-label"
-                      style={{ marginBottom: "16px" }}
-                    >
-                      Passers ({passers.length})
+                <>
+                  <div className="dash-stats-row dash-stats-row-4">
+                    <div className="dash-stat">
+                      <div className="dash-stat-value">{totalStudents}</div>
+                      <div className="dash-stat-label">Students</div>
                     </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--ink-muted)",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      Must complete all 6 exams. GWA ≥ 75% with no subject score
-                      &lt; 50%.
+                    <div className="dash-stat">
+                      <div className="dash-stat-value">{passers.length}</div>
+                      <div className="dash-stat-label">Passers</div>
                     </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px",
-                      }}
-                    >
-                      {passers.length === 0 ? (
-                        <div style={{ color: "var(--ink-muted)" }}>
-                          No passers found.
-                        </div>
-                      ) : (
-                        passers.map((p, i) => (
-                          <div
-                            key={i}
-                            className="dash-list-row dash-list-row-good"
-                          >
-                            <span>{p.name}</span>
-                            <span className="dash-list-value dash-list-value-good">
-                              {p.gwa}%
-                            </span>
-                          </div>
-                        ))
-                      )}
+                    <div className="dash-stat">
+                      <div className="dash-stat-value">{highestGwa}%</div>
+                      <div className="dash-stat-label">Highest GWA</div>
+                    </div>
+                    <div className="dash-stat">
+                      <div className="dash-stat-value">{averageGwa}%</div>
+                      <div className="dash-stat-label">Average GWA</div>
                     </div>
                   </div>
 
-                  <div className="dashboard-split-right dash-panel">
-                    <div
-                      className="dash-section-label"
-                      style={{ marginBottom: "16px" }}
-                    >
-                      Top 10 Highest GWA
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--ink-muted)",
-                        marginBottom: "16px",
-                      }}
-                    >
-                      Weighted according to LLE standard.
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "8px",
-                      }}
-                    >
-                      {top10.length === 0 ? (
-                        <div style={{ color: "var(--ink-muted)" }}>
-                          No results yet.
-                        </div>
-                      ) : (
-                        top10.map((t, i) => {
-                          const isComplete = t.totalWeight === 100;
-                          return (
+                  <div className="dashboard-split-layout">
+                    <div className="dashboard-split-left dash-panel">
+                      <div
+                        className="dash-section-label"
+                        style={{ marginBottom: "16px" }}
+                      >
+                        Passers ({passers.length})
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--ink-muted)",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        Must complete all 6 exams. GWA ≥ 75% with no subject
+                        score &lt; 50%.
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        {passers.length === 0 ? (
+                          <div style={{ color: "var(--ink-muted)" }}>
+                            No passers found.
+                          </div>
+                        ) : (
+                          passers.map((p, i) => (
                             <div
                               key={i}
-                              className={`dash-list-row${i < 3 && isComplete ? " dash-list-row-accent" : ""}${!isComplete ? " dash-list-row-muted" : ""}`}
+                              className="dash-list-row dash-list-row-good"
                             >
-                              <span>
-                                <span className="dash-list-rank">{i + 1}.</span>{" "}
-                                {t.name}{" "}
-                                {!isComplete && (
+                              <span>{p.name}</span>
+                              <span className="dash-list-value dash-list-value-good">
+                                {p.gwa}%
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="dashboard-split-right dash-panel">
+                      <div
+                        className="dash-section-label"
+                        style={{ marginBottom: "16px" }}
+                      >
+                        Top 10 Highest GWA
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--ink-muted)",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        Weighted according to LLE standard.
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "8px",
+                        }}
+                      >
+                        {top10.length === 0 ? (
+                          <div style={{ color: "var(--ink-muted)" }}>
+                            No results yet.
+                          </div>
+                        ) : (
+                          top10.map((t, i) => {
+                            const isComplete = t.totalWeight === 100;
+                            return (
+                              <div
+                                key={i}
+                                className={`dash-list-row${i < 3 && isComplete ? " dash-list-row-accent" : ""}${!isComplete ? " dash-list-row-muted" : ""}`}
+                              >
+                                <span>
+                                  <span className="dash-list-rank">
+                                    {i + 1}.
+                                  </span>{" "}
+                                  {t.name}{" "}
+                                  {!isComplete && (
+                                    <span
+                                      style={{
+                                        fontSize: "14px",
+                                        color: "var(--ink-muted)",
+                                      }}
+                                    >
+                                      ⏳︎
+                                    </span>
+                                  )}
+                                </span>
+                                <span className="dash-list-value">
+                                  {t.gwa}%
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {analyticsExamId !== "ALL" && currentExam && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "20px",
+                  }}
+                >
+                  <div
+                    className="dash-panel"
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "16px",
+                    }}
+                  >
+                    <div>
+                      <div className="dash-set-title" style={{ fontSize: "16px" }}>
+                        {currentExam.title}
+                      </div>
+                      <div className="dash-exam-code">
+                        {currentExam.subject_code} · {analyticsResults.length}{" "}
+                        student{analyticsResults.length === 1 ? "" : "s"}{" "}
+                        attempted
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                      <button
+                        className={`dash-pill-toggle${examSubView === "ITEM_ANALYSIS" ? " active" : ""}`}
+                        onClick={() => setExamSubView("ITEM_ANALYSIS")}
+                      >
+                        Item Analysis
+                      </button>
+                      <button
+                        className={`dash-pill-toggle${examSubView === "SCORES" ? " active" : ""}`}
+                        onClick={() => setExamSubView("SCORES")}
+                      >
+                        Ranked Scores
+                      </button>
+                    </div>
+                  </div>
+
+                  {analyticsResults.length === 0 ? (
+                    <div
+                      className="dash-panel"
+                      style={{ color: "var(--ink-muted)" }}
+                    >
+                      No attempts recorded for this exam yet.
+                    </div>
+                  ) : examSubView === "SCORES" ? (
+                    <div>
+                      <div
+                        className="dash-stats-row dash-stats-row-4"
+                        style={{ marginBottom: "20px" }}
+                      >
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {analyticsResults.length}
+                          </div>
+                          <div className="dash-stat-label">Students</div>
+                        </div>
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {examScoreStats.highest}%
+                          </div>
+                          <div className="dash-stat-label">Highest Score</div>
+                        </div>
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {examScoreStats.average}%
+                          </div>
+                          <div className="dash-stat-label">Average Score</div>
+                        </div>
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {examScoreStats.lowest}%
+                          </div>
+                          <div className="dash-stat-label">Lowest Score</div>
+                        </div>
+                      </div>
+
+                      <div className="dash-panel">
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: "12px",
+                            marginBottom: "16px",
+                          }}
+                        >
+                          <input
+                            className="dash-input"
+                            placeholder="Search by name…"
+                            value={scoreSearch}
+                            onChange={(e) => setScoreSearch(e.target.value)}
+                            style={{ maxWidth: "240px" }}
+                          />
+                          <div
+                            style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+                          >
+                            <button
+                              className={`dash-pill-toggle${scoreSortMode === "SCORE" ? " active" : ""}`}
+                              onClick={() => setScoreSortMode("SCORE")}
+                            >
+                              Sort: Score
+                            </button>
+                            <button
+                              className={`dash-pill-toggle${scoreSortMode === "TIME" ? " active" : ""}`}
+                              onClick={() => setScoreSortMode("TIME")}
+                            >
+                              Sort: Fastest Time
+                            </button>
+                          </div>
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "8px",
+                          }}
+                        >
+                          {scoreRankings.length === 0 ? (
+                            <div style={{ color: "var(--ink-muted)" }}>
+                              No students match that search.
+                            </div>
+                          ) : (
+                            scoreRankings.map((r) => (
+                              <div
+                                key={r.id}
+                                className={`dash-list-row${scoreSortMode === "SCORE" && r.rank <= 3 ? " dash-list-row-accent" : ""}`}
+                              >
+                                <span>
+                                  {scoreSortMode === "SCORE" && (
+                                    <span className="dash-list-rank">
+                                      {r.rank}.
+                                    </span>
+                                  )}
+                                  {r.name}{" "}
                                   <span
                                     style={{
-                                      fontSize: "14px",
+                                      marginLeft: "6px",
+                                      fontSize: "11px",
                                       color: "var(--ink-muted)",
                                     }}
                                   >
-                                    ⏳︎
+                                    {r.correct}/{r.total} correct ·{" "}
+                                    {Math.floor(r.time / 60)}m {r.time % 60}s
                                   </span>
-                                )}
-                              </span>
-                              <span className="dash-list-value">{t.gwa}%</span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {analyticsExamId !== "ALL" && analyticsExamContent && (
-                <div>
-                  <div
-                    className="dash-section-label"
-                    style={{ marginBottom: "16px" }}
-                  >
-                    Item Analysis (Students: {analyticsResults.length})
-                  </div>
-                  <div className="dash-panel">
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "16px",
-                      }}
-                    >
-                      {itemAnalysis.map((item: any, idx: number) => (
-                        <div key={idx} className="dash-question-card">
-                          <div className="dash-question-eyebrow">
-                            Question {item.questionNum}
-                          </div>
-                          <div className="dash-question-stem">{item.stem}</div>
-
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: "12px",
-                            }}
-                          >
-                            {item.options.map((opt: any) => {
-                              const count = item.tally[opt.letter] || 0;
-                              const percent =
-                                analyticsResults.length > 0
-                                  ? Math.round(
-                                      (count / analyticsResults.length) * 100,
-                                    )
-                                  : 0;
-                              const isCorrect =
-                                opt.letter === item.correctLetter;
-
-                              return (
-                                <div
-                                  key={opt.letter}
-                                  className={`dash-option-row${isCorrect ? " correct" : ""}`}
-                                >
-                                  <div className="dash-option-main">
-                                    <div className="dash-option-letter">
-                                      {opt.letter}
-                                    </div>
-                                    <div className="dash-option-text">
-                                      {opt.text}
-                                    </div>
-                                  </div>
-                                  <div className="dash-option-tally">
-                                    <div className="dash-option-count">
-                                      {count}
-                                    </div>
-                                    <div className="dash-option-percent">
-                                      {percent}%
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-
-                            {item.tally["No Answer"] > 0 && (
-                              <div className="dash-option-row skip">
-                                <div className="dash-option-text skip">
-                                  No Answer / Skipped
-                                </div>
-                                <div className="dash-option-tally">
-                                  <div
-                                    className="dash-option-count"
-                                    style={{ color: "var(--ink-muted)" }}
-                                  >
-                                    {item.tally["No Answer"]}
-                                  </div>
-                                  <div className="dash-option-percent">
-                                    {Math.round(
-                                      (item.tally["No Answer"] /
-                                        analyticsResults.length) *
-                                        100,
-                                    )}
-                                    %
-                                  </div>
-                                </div>
+                                </span>
+                                <span className="dash-list-value">
+                                  {r.score}%
+                                </span>
                               </div>
-                            )}
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div
+                        className="dash-stats-row dash-stats-row-4"
+                        style={{ marginBottom: "20px" }}
+                      >
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {analyticsResults.length}
+                          </div>
+                          <div className="dash-stat-label">Students</div>
+                        </div>
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {examScoreStats.average}%
+                          </div>
+                          <div className="dash-stat-label">Average Score</div>
+                        </div>
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {flaggedItems.length}
+                          </div>
+                          <div className="dash-stat-label">
+                            Hard Items (&lt;50%)
                           </div>
                         </div>
-                      ))}
+                        <div className="dash-stat">
+                          <div className="dash-stat-value">
+                            {itemAnalysisRaw.length}
+                          </div>
+                          <div className="dash-stat-label">Total Items</div>
+                        </div>
+                      </div>
+
+                      {flaggedItems.length > 0 && (
+                        <div
+                          className="dash-focus-callout danger"
+                          style={{ marginBottom: "20px" }}
+                        >
+                          <strong>
+                            {flaggedItems.length} question
+                            {flaggedItems.length === 1 ? "" : "s"}
+                          </strong>{" "}
+                          answered correctly by fewer than half the class:{" "}
+                          {flaggedItems
+                            .map((f: any) => `#${f.questionNum}`)
+                            .join(", ")}
+                          .
+                        </div>
+                      )}
+
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          flexWrap: "wrap",
+                          gap: "12px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        <div
+                          className="dash-section-label"
+                          style={{ marginBottom: 0 }}
+                        >
+                          Item-by-Item Breakdown
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <button
+                            className={`dash-pill-toggle${itemSortMode === "ORDER" ? " active" : ""}`}
+                            onClick={() => setItemSortMode("ORDER")}
+                          >
+                            Question Order
+                          </button>
+                          <button
+                            className={`dash-pill-toggle${itemSortMode === "DIFFICULTY" ? " active" : ""}`}
+                            onClick={() => setItemSortMode("DIFFICULTY")}
+                          >
+                            Hardest First
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="dash-panel">
+                        <div
+                          style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "16px",
+                          }}
+                        >
+                          {itemAnalysis.map((item: any, idx: number) => (
+                            <div key={idx} className="dash-question-card">
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "flex-start",
+                                  gap: "12px",
+                                  marginBottom: "8px",
+                                }}
+                              >
+                                <div
+                                  className="dash-question-eyebrow"
+                                  style={{ marginBottom: 0 }}
+                                >
+                                  Question {item.questionNum}
+                                  <span
+                                    style={{
+                                      marginLeft: "10px",
+                                      color: "var(--ink-faint)",
+                                    }}
+                                  >
+                                    Discrimination:{" "}
+                                    {item.discrimination.toFixed(2)}
+                                  </span>
+                                </div>
+                                <span
+                                  className={`dash-badge dash-badge-${item.difficultyTier.toLowerCase()}`}
+                                >
+                                  {item.difficultyTier === "EASY"
+                                    ? "Easy"
+                                    : item.difficultyTier === "MODERATE"
+                                      ? "Moderate"
+                                      : "Hard"}{" "}
+                                  · {Math.round(item.difficulty * 100)}%
+                                  correct
+                                </span>
+                              </div>
+                              <div className="dash-question-stem">
+                                {item.stem}
+                              </div>
+
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "12px",
+                                }}
+                              >
+                                {item.options.map((opt: any) => {
+                                  const count = item.tally[opt.letter] || 0;
+                                  const percent =
+                                    analyticsResults.length > 0
+                                      ? Math.round(
+                                          (count / analyticsResults.length) *
+                                            100,
+                                        )
+                                      : 0;
+                                  const isCorrect =
+                                    opt.letter === item.correctLetter;
+
+                                  return (
+                                    <div
+                                      key={opt.letter}
+                                      className={`dash-option-row${isCorrect ? " correct" : ""}`}
+                                    >
+                                      <div className="dash-option-main">
+                                        <div className="dash-option-letter">
+                                          {opt.letter}
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div className="dash-option-text">
+                                            {opt.text}
+                                          </div>
+                                          <div className="dash-option-bar-track">
+                                            <div
+                                              className="dash-option-bar-fill"
+                                              style={{ width: `${percent}%` }}
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="dash-option-tally">
+                                        <div className="dash-option-count">
+                                          {count}
+                                        </div>
+                                        <div className="dash-option-percent">
+                                          {percent}%
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {item.tally["No Answer"] > 0 && (
+                                  <div className="dash-option-row skip">
+                                    <div className="dash-option-text skip">
+                                      No Answer / Skipped
+                                    </div>
+                                    <div className="dash-option-tally">
+                                      <div
+                                        className="dash-option-count"
+                                        style={{ color: "var(--ink-muted)" }}
+                                      >
+                                        {item.tally["No Answer"]}
+                                      </div>
+                                      <div className="dash-option-percent">
+                                        {Math.round(
+                                          (item.tally["No Answer"] /
+                                            analyticsResults.length) *
+                                            100,
+                                        )}
+                                        %
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
             </>
