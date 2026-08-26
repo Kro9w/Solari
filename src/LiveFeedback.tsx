@@ -243,7 +243,7 @@ export default function LiveFeedback() {
             onClick={handleCleanupExpired}
             disabled={isCleaning}
           >
-            {isCleaning ? "Cleaning..." : "Clean Up Expired"}
+            {isCleaning ? "Cleaning..." : "Clean Up"}
           </button>
           <button className="dash-exam-btn" onClick={() => fetchSessions(true)}>
             Refresh Feed
