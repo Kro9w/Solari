@@ -121,8 +121,7 @@ export default function Dashboard() {
 
   const daysToExam = Math.max(0, getDaysUntil(EXAM_DATE));
 
-  // Single source of truth for the chart — computed once so the bars,
-  // labels, and scores can never drift out of sync with each other.
+  // Single source of truth for the chart, computed once so the bars, labels, and scores can never drift out of sync with each other
   const subjectScores = DEFAULT_SUBJECTS.map((sub) => {
     const res = targetSetResults.find((r) =>
       r.exam?.subject_code?.startsWith(sub.short),
@@ -160,7 +159,6 @@ export default function Dashboard() {
 
   return (
     <div className="dash-shell">
-      {/* ── masthead ── */}
       <div className="dash-header">
         <div style={{ position: "relative", zIndex: 2 }}>
           <div className="dash-eyebrow">Exam Dashboard</div>
@@ -196,10 +194,16 @@ export default function Dashboard() {
                 const y1 = 100 - rOuter * Math.cos(angle);
                 const x2 = 100 + rInner * Math.sin(angle);
                 const y2 = 100 - rInner * Math.cos(angle);
+                const colorDriftDuration = 20;
+                const colorDriftDelay =
+                  (i / 24) * colorDriftDuration - colorDriftDuration / 2;
+
                 return (
                   <line
                     key={i}
-                    className="dash-tick"
+                    className={
+                      isMajor ? "dash-tick" : "dash-tick dash-tick-minor"
+                    }
                     x1={x1}
                     y1={y1}
                     x2={x2}
@@ -211,7 +215,9 @@ export default function Dashboard() {
                     strokeLinecap="round"
                     style={
                       {
-                        animationDelay: `${i * 0.03}s`,
+                        animationDelay: isMajor
+                          ? `${i * 0.03}s`
+                          : `${i * 0.03}s, ${colorDriftDelay}s`,
                         "--tick-opacity": isMajor ? 1 : 0.6,
                       } as React.CSSProperties
                     }
@@ -223,7 +229,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── stats row ── */}
       <div className="dash-stats-row">
         <div className="dash-stat">
           <div className="dash-stat-value">{daysToExam}</div>
@@ -239,9 +244,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── split layout ── */}
       <div className="dashboard-split-layout">
-        {/* left: available exams */}
         <div className="dashboard-split-left">
           <div className="dash-section-label">Available Live Exams</div>
           <div className="dash-panel">
@@ -311,7 +314,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* right: performance statistics */}
         <div className="dashboard-split-right">
           <div className="dash-section-label">Performance Statistics</div>
           <div className="dash-panel">
@@ -351,7 +353,6 @@ export default function Dashboard() {
 
             {targetSetResults.length > 0 ? (
               <>
-                {/* weaknesses bar chart */}
                 <div className="dash-chart">
                   <div className="dash-chart-visual">
                     <div className="dash-chart-grid">
@@ -521,7 +522,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* GWA + focus area */}
                 <div
                   style={{
                     display: "flex",
@@ -576,7 +576,6 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                {/* recent results */}
                 <div style={{ marginTop: "28px" }}>
                   <div
                     style={{
@@ -671,7 +670,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── exam summary modal ── */}
       {selectedResultForModal && (
         <div
           style={{

@@ -75,10 +75,6 @@ body,
 }
 
 html {
-  /* Always reserve the scrollbar's width, whether or not it's currently
-     needed, so centered layouts (dash-shell, auth-shell, etc.) don't
-     shift left/right for a frame when a view's content height crosses
-     the scroll threshold — most noticeable when switching tabs. */
   scrollbar-gutter: stable;
   overflow-y: scroll;
 }
@@ -247,11 +243,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .dashboard-split-left {
-  flex: 6; /* 60% */
+  flex: 6;
 }
 
 .dashboard-split-right {
-  flex: 4; /* 40% */
+  flex: 4;
 }
 
 @media (max-width: 1024px) {
@@ -598,7 +594,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin: 0 auto 20px;
 }
 
-/* Fade-in animation for views */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -629,7 +624,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   animation: fadeDown 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* ── DESKTOP STUDY LAYOUT ── */
 .desktop-study-layout {
   display: flex;
   justify-content: center;
@@ -691,7 +685,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* ── STREAK BLOB ── */
 @keyframes blobMorph {
   0% {
     border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
@@ -732,7 +725,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-weight: bold;
 }
 
-/* ── COMPLIMENT TEXT ── */
 .study-compliment-text {
   font-family: var(--font-display);
   font-size: calc(56px * var(--scale, 1));
@@ -810,7 +802,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   padding-bottom: 0 !important;
 }
 
-/* ── Auth (Login / Signup) editorial layout ── */
 .auth-shell {
   display: flex;
   min-height: 100vh;
@@ -1080,11 +1071,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     opacity: 1 !important;
   }
 }
-
-/* ── Auth page transition (Login ⇄ Signup) ── */
-/* One element animates itself in and out — no overlay swiping across
-   the screen, so there is nothing to "hand off" between pages and
-   nothing that can look like two separate sweeps. */
 .auth-shell {
   position: relative;
   animation: authEnter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -1255,7 +1241,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* ── Dashboard editorial layout ── */
 .dash-shell {
   padding: 40px 32px 64px;
   max-width: 1040px;
@@ -1308,6 +1293,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0;
   animation: tickIn 0.5s ease-out forwards;
 }
+.dash-tick.dash-tick-minor {
+  animation:
+    tickIn 0.5s ease-out forwards,
+    dashColorDrift 20s linear infinite;
+}
+
+@keyframes dashColorDrift {
+  0%,
+  44%,
+  56%,
+  100% {
+    stroke: var(--cream-border);
+  }
+  50% {
+    stroke: color-mix(in srgb, var(--cream-border) 40%, black 60%);
+  }
+}
 
 .dash-eyebrow {
   font-family: var(--font-body);
@@ -1335,7 +1337,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-top: 8px;
 }
 
-/* ── live clock ── */
 .live-clock {
   display: inline-flex;
   align-items: center;
@@ -1757,7 +1758,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.7;
 }
 
-/* ── Admin dashboard editorial polish ── */
 .dash-back-btn {
   display: inline-flex;
   align-items: center;
@@ -2065,7 +2065,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   line-height: 1.5;
 }
 
-/* ── Shared modal chrome (confirmation dialogs, progress modals) ── */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -2195,7 +2194,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   opacity: 0.6;
 }
 
-/* ── Live feedback ── */
 .feed-shell {
   display: flex;
   flex-direction: column;
@@ -2318,7 +2316,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--accent);
 }
 
-/* ── Page-to-page view transitions ── */
+/* Page to page view transitions */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.32s;
@@ -2333,7 +2331,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
-/* ── App Loader ── */
+/* App Loader */
 .app-loader {
   width: 80px;
   aspect-ratio: 2;

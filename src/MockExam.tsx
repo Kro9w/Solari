@@ -16,7 +16,6 @@ export type Question = {
   explanation?: string;
 };
 
-// ── item parser
 export function parseExamMetadata(
   raw: string,
 ): { code: string; durationSeconds?: number } | null {
@@ -450,11 +449,17 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     }
   }, [elapsed, examDuration, phase, questions, answers, submitError]); // Depend on answers/questions so finishExam gets freshest state
 
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (phase !== "exam" || questions.length === 0 || !user?.id || !examId)
       return;
 
+    let isMounted = true;
+
     const saveSession = async () => {
+      if (isSubmittingRef.current || phase !== "exam") return;
+
       setSyncStatus("syncing");
 
       // If they are a late taker, explicitly check if the admin turned the reopen toggle off mid-exam
@@ -507,16 +512,25 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         );
 
         if (error) throw error;
-        setSyncStatus("synced");
+        if (isMounted) {
+          setSyncStatus("synced");
+        }
       } catch (err) {
         // Silent fail for network issues, local is saved
-        setSyncStatus("offline");
+        if (isMounted) {
+          setSyncStatus("offline");
+        }
       }
     };
 
     // Only save when user interacts (answers, bookmarks, current page changes), NOT when elapsed changes
-    const timeout = setTimeout(saveSession, 500);
-    return () => clearTimeout(timeout);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncTimeoutRef.current = setTimeout(saveSession, 500);
+
+    return () => {
+      isMounted = false;
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
   }, [answers, bookmarks, current, phase, questions, user, examId]);
 
   function choose(letter: string) {
@@ -536,6 +550,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
     isSubmittingRef.current = true;
 
     if (timerRef.current) clearInterval(timerRef.current);
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
 
     const correctCount = questions.filter((q, i) => {
       const chosen = answers[i];
@@ -785,7 +800,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         </div>
 
-        {/* Scrollable Question Content */}
         <div
           style={{
             flex: 1,
@@ -804,7 +818,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               paddingBottom: "24px",
             }}
           >
-            {/* Bookmarks */}
             <div
               style={{
                 display: "flex",
@@ -834,7 +847,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               </button>
             </div>
 
-            {/* Question Card */}
             <div
               style={{
                 background: "var(--cream-dark)",
@@ -894,7 +906,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
               </div>
             </div>
 
-            {/* Options */}
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
             >
@@ -956,7 +967,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         </div>
 
-        {/* Bookmarks Modal */}
         {showBookmarksModal && (
           <div
             style={{
@@ -1080,7 +1090,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
-        {/* Submit Confirmation Modal */}
         {showSubmitModal && (
           <div
             style={{
@@ -1211,7 +1220,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
-        {/* Connection Error Submission Modal */}
         {submitError && (
           <div
             style={{
@@ -1282,7 +1290,6 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
           </div>
         )}
 
-        {/* Bottom Navigation */}
         <div
           style={{
             padding: "16px 24px",
