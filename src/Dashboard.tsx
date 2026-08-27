@@ -93,6 +93,18 @@ export default function Dashboard() {
   let totalGWA: number | null = null;
   let lowestSubject: any = null;
 
+  let targetSet = examSets.find((s) => s.id === selectedStatsSetId);
+
+  let availableSubjectsCount = 0;
+  if (targetSet) {
+    const uniqueSubjects = new Set(
+      targetSet.exams?.map((e: any) => e.subject_code?.split("_")[0]),
+    );
+    availableSubjectsCount = uniqueSubjects.size;
+  }
+  const isPracticeIncomplete =
+    targetSet?.type === "PRACTICE" && availableSubjectsCount < 6;
+
   if (results.length > 0 && selectedStatsSetId) {
     targetSetResults = results.filter(
       (r) => r.exam?.exam_set_id === selectedStatsSetId,
@@ -106,9 +118,14 @@ export default function Dashboard() {
       targetSetResults.forEach((r) => {
         const code = r.exam?.subject_code?.split("_")[0];
         const sub = DEFAULT_SUBJECTS.find((s) => s.short === code);
-        const weight = sub?.weight || 0;
-        gwaSum += r.score * (weight / 100);
-        totalWeight += weight;
+
+        if (isPracticeIncomplete) {
+          gwaSum += r.score * (100 / availableSubjectsCount / 100);
+        } else {
+          const weight = sub?.weight || 0;
+          gwaSum += r.score * (weight / 100);
+          totalWeight += weight;
+        }
 
         if (r.score < lowestScore) {
           lowestScore = r.score;
@@ -123,13 +140,28 @@ export default function Dashboard() {
   const daysToExam = Math.max(0, getDaysUntil(EXAM_DATE));
 
   // Single source of truth for the chart, computed once so the bars, labels, and scores can never drift out of sync with each other
-  const subjectScores = DEFAULT_SUBJECTS.map((sub) => {
+  const subjectScores = DEFAULT_SUBJECTS.filter((sub) => {
+    if (isPracticeIncomplete) {
+      // In a practice exam with < 6 subjects, only include the subjects that are actually in the exam set
+      return targetSet?.exams?.some((e: any) =>
+        e.subject_code?.startsWith(sub.short),
+      );
+    }
+    return true; // Keep all subjects for MOCK or complete PRACTICE exams
+  }).map((sub) => {
     const res = targetSetResults.find((r) =>
       r.exam?.subject_code?.startsWith(sub.short),
     );
     const score = res ? res.score : null;
-    const weightedScore =
-      score !== null ? score * ((sub.weight || 0) / 100) : null;
+
+    let weightedScore = null;
+    if (score !== null) {
+      if (isPracticeIncomplete) {
+        weightedScore = score * (100 / availableSubjectsCount / 100);
+      } else {
+        weightedScore = score * ((sub.weight || 0) / 100);
+      }
+    }
     return { short: sub.short, score, weightedScore, weight: sub.weight };
   });
 
@@ -264,6 +296,10 @@ export default function Dashboard() {
                   </div>
 
                   {set.exams?.map((exam: any) => {
+                    if (set.type === "PRACTICE" && !exam.is_active) {
+                      return null; // Don't show inactive practice exams
+                    }
+
                     const startTime = new Date(exam.accessible_at).getTime();
                     const endTime =
                       startTime + (exam.duration_minutes || 150) * 60000;
@@ -272,8 +308,11 @@ export default function Dashboard() {
                     const originalTimeWindowOpen =
                       now >= startTime && now <= endTime;
                     const isTimeWindowOpen =
-                      originalTimeWindowOpen ||
-                      (now > endTime && exam.is_reopened);
+                      set.type === "PRACTICE"
+                        ? now >= startTime && exam.is_active
+                        : originalTimeWindowOpen ||
+                          (now > endTime && exam.is_reopened);
+
                     const hasTaken = results.some((r) => r.exam_id === exam.id);
 
                     return (
@@ -297,13 +336,17 @@ export default function Dashboard() {
                             }
                             disabled={!isTimeWindowOpen}
                           >
-                            {originalTimeWindowOpen
-                              ? "Start Exam"
-                              : exam.is_reopened
-                                ? "Start Exam (Late)"
-                                : now > endTime
-                                  ? "Closed"
-                                  : `Opens ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
+                            {set.type === "PRACTICE"
+                              ? isTimeWindowOpen
+                                ? "Start Practice Exam"
+                                : `Opens ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`
+                              : originalTimeWindowOpen
+                                ? "Start Exam"
+                                : exam.is_reopened
+                                  ? "Start Exam (Late)"
+                                  : now > endTime
+                                    ? "Closed"
+                                    : `Opens ${new Date(exam.accessible_at).toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`}
                           </button>
                         )}
                       </div>
@@ -523,59 +566,61 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "16px",
-                    marginTop: "22px",
-                  }}
-                >
-                  <div>
-                    <div className="dash-gwa-row">
-                      <div style={{ fontSize: "13px", fontWeight: 500 }}>
-                        Estimated GWA
+                {!isPracticeIncomplete && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "16px",
+                      marginTop: "22px",
+                    }}
+                  >
+                    <div>
+                      <div className="dash-gwa-row">
+                        <div style={{ fontSize: "13px", fontWeight: 500 }}>
+                          Estimated GWA
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "var(--font-display)",
+                            fontSize: "17px",
+                            color:
+                              (totalGWA || 0) >= 75
+                                ? "var(--green)"
+                                : "var(--red)",
+                          }}
+                        >
+                          {totalGWA}%
+                        </div>
+                      </div>
+                      <div className="dash-gwa-track">
+                        <div
+                          className="dash-gwa-fill"
+                          style={{
+                            width: `${totalGWA || 0}%`,
+                            background:
+                              (totalGWA || 0) >= 75
+                                ? "var(--green)"
+                                : "var(--accent)",
+                          }}
+                        />
                       </div>
                       <div
                         style={{
-                          fontFamily: "var(--font-display)",
-                          fontSize: "17px",
-                          color:
-                            (totalGWA || 0) >= 75
-                              ? "var(--green)"
-                              : "var(--red)",
+                          fontSize: "11px",
+                          color: "var(--ink-muted)",
+                          marginTop: "6px",
                         }}
                       >
-                        {totalGWA}%
+                        Target: 75% to pass
                       </div>
                     </div>
-                    <div className="dash-gwa-track">
-                      <div
-                        className="dash-gwa-fill"
-                        style={{
-                          width: `${totalGWA || 0}%`,
-                          background:
-                            (totalGWA || 0) >= 75
-                              ? "var(--green)"
-                              : "var(--accent)",
-                        }}
-                      />
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--ink-muted)",
-                        marginTop: "6px",
-                      }}
-                    >
-                      Target: 75% to pass
-                    </div>
-                  </div>
 
-                  <div className={`dash-focus-callout ${focusTier}`}>
-                    {focusMessage}
+                    <div className={`dash-focus-callout ${focusTier}`}>
+                      {focusMessage}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div style={{ marginTop: "28px" }}>
                   <div
@@ -784,6 +829,7 @@ export default function Dashboard() {
                           color: "var(--ink)",
                           marginBottom: "12px",
                           lineHeight: 1.4,
+                          whiteSpace: "pre-wrap",
                         }}
                       >
                         {q.stem}
@@ -847,6 +893,7 @@ export default function Dashboard() {
                                 style={{
                                   fontSize: "14px",
                                   color: "var(--ink)",
+                                  whiteSpace: "pre-wrap",
                                 }}
                               >
                                 {opt.text}
@@ -865,6 +912,21 @@ export default function Dashboard() {
                           }}
                         >
                           You skipped this question.
+                        </div>
+                      )}
+                      {q.explanation && !isCorrectlyAnswered && (
+                        <div
+                          style={{
+                            marginTop: "16px",
+                            paddingTop: "16px",
+                            borderTop: "1px solid var(--cream-border)",
+                            fontSize: "14px",
+                            color: "var(--ink)",
+                            lineHeight: 1.5,
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          <strong>Explanation:</strong> {q.explanation}
                         </div>
                       )}
                     </div>

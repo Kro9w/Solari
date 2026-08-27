@@ -9,6 +9,7 @@ datasource db {
 model ExamSet {
   id            String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   title         String
+  type          String    @default("MOCK")
   accessible_at DateTime  @db.Timestamptz(6)
   is_public     Boolean   @default(false)
   created_at    DateTime? @default(now()) @db.Timestamptz(6)
@@ -27,6 +28,7 @@ model Exam {
   accessible_at    DateTime  @db.Timestamptz(6)
   duration_minutes Int       @default(150)
   is_reopened      Boolean   @default(false)
+  is_active        Boolean   @default(true)
   created_at       DateTime? @default(now()) @db.Timestamptz(6)
 
   exam_set     ExamSet      @relation(fields: [exam_set_id], references: [id])

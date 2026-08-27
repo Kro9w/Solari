@@ -73,6 +73,7 @@ export default function AdminDashboard() {
   // Create Set State
   const [setTitle, setSetTitle] = useState("");
   const [setAccessibleAt, setSetAccessibleAt] = useState("");
+  const [setType, setSetType] = useState<"MOCK" | "PRACTICE">("MOCK");
   const [creatingSet, setCreatingSet] = useState(false);
   const [setMessage, setSetMessage] = useState("");
 
@@ -115,9 +116,7 @@ export default function AdminDashboard() {
   const [itemSortMode, setItemSortMode] = useState<"ORDER" | "DIFFICULTY">(
     "ORDER",
   );
-  const [scoreSortMode, setScoreSortMode] = useState<"SCORE" | "TIME">(
-    "SCORE",
-  );
+  const [scoreSortMode, setScoreSortMode] = useState<"SCORE" | "TIME">("SCORE");
   const [scoreSearch, setScoreSearch] = useState("");
 
   useEffect(() => {
@@ -129,7 +128,7 @@ export default function AdminDashboard() {
     const { data, error } = await supabase
       .from("exam_sets")
       .select(
-        "*, exams(id, title, subject_code, duration_minutes, accessible_at, file_content, is_reopened)",
+        "*, exams(id, title, subject_code, duration_minutes, accessible_at, file_content, is_reopened, is_active)",
       )
       .order("created_at", { ascending: false });
 
@@ -160,18 +159,23 @@ export default function AdminDashboard() {
 
   const handleCreateSet = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!setTitle || !setAccessibleAt) {
-      setSetMessage("Please fill in title and accessible at.");
+    if (!setTitle || (setType === "MOCK" && !setAccessibleAt)) {
+      setSetMessage("Please fill in the required fields.");
       return;
     }
     setCreatingSet(true);
     setSetMessage("");
     try {
+      const targetAccessibleAt =
+        setType === "PRACTICE"
+          ? new Date().toISOString()
+          : new Date(setAccessibleAt).toISOString();
       const { data, error } = await supabase
         .from("exam_sets")
         .insert({
           title: setTitle,
-          accessible_at: new Date(setAccessibleAt).toISOString(),
+          accessible_at: targetAccessibleAt,
+          type: setType,
           is_public: false, // Default to negative/private
         })
         .select()
@@ -180,6 +184,7 @@ export default function AdminDashboard() {
       setSetMessage("Exam set created successfully!");
       setSetTitle("");
       setSetAccessibleAt("");
+      setSetType("MOCK");
       await fetchExamSets();
       if (data) {
         setSelectedSet({ ...data, exams: [] });
@@ -253,7 +258,7 @@ export default function AdminDashboard() {
         const { data } = await supabase
           .from("exam_sets")
           .select(
-            "*, exams(id, title, subject_code, duration_minutes, accessible_at, is_reopened)",
+            "*, exams(id, title, subject_code, duration_minutes, accessible_at, is_reopened, is_active)",
           )
           .eq("id", selectedSet.id)
           .single();
@@ -344,7 +349,10 @@ export default function AdminDashboard() {
     examsArray: any[],
     baseTimeIso: string,
   ) => {
-    const schedule = calculateExamSchedule(examsArray, baseTimeIso);
+    const schedule =
+      selectedSet?.type === "PRACTICE"
+        ? examsArray.map((e) => ({ id: e.id, accessible_at: baseTimeIso }))
+        : calculateExamSchedule(examsArray, baseTimeIso);
     for (let i = 0; i < schedule.length; i++) {
       const { id, accessible_at } = schedule[i];
       const exam = examsArray[i];
@@ -411,10 +419,16 @@ export default function AdminDashboard() {
         duration_minutes: 150,
       };
 
-      const schedule = calculateExamSchedule(
-        [...currentExams, dummyExamForCalculation],
-        selectedSet.accessible_at,
-      );
+      const schedule =
+        selectedSet?.type === "PRACTICE"
+          ? [...currentExams, dummyExamForCalculation].map((e) => ({
+              id: e.id,
+              accessible_at: selectedSet.accessible_at,
+            }))
+          : calculateExamSchedule(
+              [...currentExams, dummyExamForCalculation],
+              selectedSet.accessible_at,
+            );
       const newExamSchedule = schedule[schedule.length - 1];
 
       const { error } = await supabase.from("exams").insert({
@@ -508,11 +522,26 @@ export default function AdminDashboard() {
       let totalWeight = 0;
       let anyBelow50 = false;
 
+      let availableSubjectsCount = 0;
+      if (currentSet) {
+        const uniqueSubjects = new Set(
+          currentSet.exams?.map((e: any) => e.subject_code?.split("_")[0]),
+        );
+        availableSubjectsCount = uniqueSubjects.size;
+      }
+
+      const isPracticeIncomplete =
+        currentSet?.type === "PRACTICE" && availableSubjectsCount < 6;
+
       DEFAULT_SUBJECTS.forEach((sub) => {
         const s = student.scores[sub.short];
         if (s !== undefined) {
-          gwaSum += s * (sub.weight / 100);
-          totalWeight += sub.weight;
+          if (isPracticeIncomplete) {
+            gwaSum += s * (100 / availableSubjectsCount / 100);
+          } else {
+            gwaSum += s * (sub.weight / 100);
+            totalWeight += sub.weight;
+          }
           if (s < 50) anyBelow50 = true;
         }
       });
@@ -522,7 +551,10 @@ export default function AdminDashboard() {
       const gwa = Math.round(gwaSum);
 
       // A student can ONLY officially be a passer if they have taken 100% of the weights.
-      const isPasser = totalWeight === 100 && gwa >= 75 && !anyBelow50;
+      const isPasser =
+        (totalWeight === 100 || isPracticeIncomplete) &&
+        gwa >= 75 &&
+        !anyBelow50;
 
       return { name: student.user_name, gwa, isPasser, totalWeight };
     });
@@ -559,10 +591,7 @@ export default function AdminDashboard() {
     const byScoreDesc = [...analyticsResults].sort(
       (a, b) => (b.score ?? 0) - (a.score ?? 0),
     );
-    const groupSize = Math.max(
-      1,
-      Math.round(byScoreDesc.length * 0.27),
-    );
+    const groupSize = Math.max(1, Math.round(byScoreDesc.length * 0.27));
     const upperGroup = byScoreDesc.slice(0, groupSize);
     const lowerGroup = byScoreDesc.slice(-groupSize);
 
@@ -582,7 +611,8 @@ export default function AdminDashboard() {
         else tally["No Answer"]++;
       });
 
-      const correctLetter = q.options.find((o: any) => o.correct)?.letter || "?";
+      const correctLetter =
+        q.options.find((o: any) => o.correct)?.letter || "?";
       const correctCount = tally[correctLetter] || 0;
       const difficulty =
         analyticsResults.length > 0
@@ -666,9 +696,7 @@ export default function AdminDashboard() {
       return { average: 0, highest: 0, lowest: 0 };
     const scores = analyticsResults.map((r) => r.score ?? 0);
     return {
-      average: Math.round(
-        scores.reduce((a, b) => a + b, 0) / scores.length,
-      ),
+      average: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
       highest: Math.max(...scores),
       lowest: Math.min(...scores),
     };
@@ -808,8 +836,24 @@ export default function AdminDashboard() {
                     }}
                   >
                     <div className="dash-field">
+                      <label className="dash-field-label">Exam Set Type</label>
+                      <select
+                        value={setType}
+                        onChange={(e) =>
+                          setSetType(e.target.value as "MOCK" | "PRACTICE")
+                        }
+                        className="dash-select"
+                        style={{ width: "100%" }}
+                      >
+                        <option value="MOCK">Mock Board Exam</option>
+                        <option value="PRACTICE">Practice Exam</option>
+                      </select>
+                    </div>
+                    <div className="dash-field">
                       <label className="dash-field-label">
-                        Set Title (e.g. 2026 Mock Exam)
+                        Set Title (e.g. 2026{" "}
+                        {setType === "PRACTICE" ? "Practice Exam" : "Mock Exam"}
+                        )
                       </label>
                       <input
                         type="text"
@@ -819,18 +863,20 @@ export default function AdminDashboard() {
                         className="dash-input"
                       />
                     </div>
-                    <div className="dash-field">
-                      <label className="dash-field-label">
-                        Start Time (First Exam Access)
-                      </label>
-                      <input
-                        type="datetime-local"
-                        value={setAccessibleAt}
-                        onChange={(e) => setSetAccessibleAt(e.target.value)}
-                        required
-                        className="dash-input"
-                      />
-                    </div>
+                    {setType === "MOCK" && (
+                      <div className="dash-field">
+                        <label className="dash-field-label">
+                          Start Time (First Exam Access)
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={setAccessibleAt}
+                          onChange={(e) => setSetAccessibleAt(e.target.value)}
+                          required
+                          className="dash-input"
+                        />
+                      </div>
+                    )}
                     <button
                       type="submit"
                       disabled={creatingSet}
@@ -1022,13 +1068,88 @@ export default function AdminDashboard() {
                               >
                                 150 mins
                               </div>
+                              {selectedSet.type === "PRACTICE" && (
+                                <button
+                                  className={`icon-btn${exam.is_active ? " icon-btn-success" : ""}`}
+                                  onClick={async () => {
+                                    const newStatus = !exam.is_active;
+                                    try {
+                                      const { error } = await supabase
+                                        .from("exams")
+                                        .update({ is_active: newStatus })
+                                        .eq("id", exam.id);
+
+                                      if (error) throw error;
+
+                                      const updatedExams =
+                                        selectedSet.exams.map((e: any) =>
+                                          e.id === exam.id
+                                            ? { ...e, is_active: newStatus }
+                                            : e,
+                                        );
+                                      setSelectedSet({
+                                        ...selectedSet,
+                                        exams: updatedExams,
+                                      });
+                                    } catch (err) {
+                                      console.error(
+                                        "Failed to toggle exam visibility:",
+                                        err,
+                                      );
+                                      alert(
+                                        "Failed to toggle exam visibility.",
+                                      );
+                                    }
+                                  }}
+                                  title={
+                                    exam.is_active ? "Hide Exam" : "Show Exam"
+                                  }
+                                >
+                                  {exam.is_active ? (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+                                      <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                  ) : (
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    >
+                                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+                                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+                                      <line x1="2" x2="22" y1="2" y2="22" />
+                                    </svg>
+                                  )}
+                                </button>
+                              )}
                               {(() => {
                                 const endTime =
                                   new Date(exam.accessible_at).getTime() +
                                   (exam.duration_minutes || 150) * 60000;
                                 const isClosed = Date.now() > endTime;
 
-                                if (isClosed) {
+                                if (
+                                  isClosed &&
+                                  selectedSet.type !== "PRACTICE"
+                                ) {
                                   return (
                                     <button
                                       className={`icon-btn${exam.is_reopened ? " icon-btn-success" : ""}`}
@@ -1391,7 +1512,10 @@ export default function AdminDashboard() {
                     }}
                   >
                     <div>
-                      <div className="dash-set-title" style={{ fontSize: "16px" }}>
+                      <div
+                        className="dash-set-title"
+                        style={{ fontSize: "16px" }}
+                      >
                         {currentExam.title}
                       </div>
                       <div className="dash-exam-code">
@@ -1400,7 +1524,9 @@ export default function AdminDashboard() {
                         attempted
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    <div
+                      style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+                    >
                       <button
                         className={`dash-pill-toggle${examSubView === "ITEM_ANALYSIS" ? " active" : ""}`}
                         onClick={() => setExamSubView("ITEM_ANALYSIS")}
@@ -1473,7 +1599,11 @@ export default function AdminDashboard() {
                             style={{ maxWidth: "240px" }}
                           />
                           <div
-                            style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+                            style={{
+                              display: "flex",
+                              gap: "8px",
+                              flexWrap: "wrap",
+                            }}
                           >
                             <button
                               className={`dash-pill-toggle${scoreSortMode === "SCORE" ? " active" : ""}`}
@@ -1601,7 +1731,13 @@ export default function AdminDashboard() {
                         >
                           Item-by-Item Breakdown
                         </div>
-                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            flexWrap: "wrap",
+                          }}
+                        >
                           <button
                             className={`dash-pill-toggle${itemSortMode === "ORDER" ? " active" : ""}`}
                             onClick={() => setItemSortMode("ORDER")}
@@ -1659,8 +1795,7 @@ export default function AdminDashboard() {
                                     : item.difficultyTier === "MODERATE"
                                       ? "Moderate"
                                       : "Hard"}{" "}
-                                  · {Math.round(item.difficulty * 100)}%
-                                  correct
+                                  · {Math.round(item.difficulty * 100)}% correct
                                 </span>
                               </div>
                               <div className="dash-question-stem">

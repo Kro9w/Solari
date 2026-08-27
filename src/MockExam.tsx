@@ -94,10 +94,10 @@ export function parseQuestions(raw: string): Question[] {
       !yMatch &&
       line.length > 0
     ) {
-      if (current.explanation) {
-        current.explanation += " " + line;
+      if (current.explanation !== undefined) {
+        current.explanation += "\n" + line;
       } else {
-        current.stem += " " + line;
+        current.stem += "\n" + line;
       }
     }
   }
@@ -191,15 +191,17 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
         const { data, error } = await supabase
           .from("exams")
-          .select("*")
+          .select("*, exam_set:exam_sets(type)")
           .eq("id", examId)
           .single();
 
         if (error) throw error;
 
+        const isPractice = data.exam_set?.type === "PRACTICE";
+
         const now = new Date();
         const accessTime = new Date(data.accessible_at);
-        if (now < accessTime) {
+        if (now < accessTime || (isPractice && !data.is_active)) {
           throw new Error("This exam is not yet accessible.");
         }
 
@@ -213,9 +215,9 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         const standardDurationSeconds =
           (data.duration_minutes || metadata?.durationSeconds || 60) * 60;
 
-        // If not reopened indefinitely, calculate the remaining real-world seconds until endTime
+        // If not reopened indefinitely and not a practice exam, calculate the remaining real-world seconds until endTime
         let actualRemainingSeconds = standardDurationSeconds;
-        if (!data.is_reopened) {
+        if (!data.is_reopened && !isPractice) {
           const secondsUntilEnd = Math.max(
             0,
             Math.floor((endTime.getTime() - now.getTime()) / 1000),
@@ -252,7 +254,31 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
 
           let bestState: any = null;
 
-          if (now > endTime && !data.is_reopened) {
+          // For practice exams, abandoned sessions still auto-submit based on their personal timer
+          let practiceAbandoned = false;
+          if (
+            isPractice &&
+            remoteSession &&
+            remoteSession.state &&
+            remoteSession.state.started_at
+          ) {
+            const sessionStart = new Date(
+              remoteSession.state.started_at,
+            ).getTime();
+            const abandonedElapsed = Math.floor(
+              (now.getTime() - sessionStart) / 1000,
+            );
+            if (abandonedElapsed >= standardDurationSeconds) {
+              practiceAbandoned = true;
+              // Modify standard duration seconds to match the local abandoned logic below
+              remoteSession.state.elapsed = standardDurationSeconds;
+            }
+          }
+
+          if (
+            (now > endTime && !data.is_reopened && !isPractice) ||
+            practiceAbandoned
+          ) {
             // Auto-submit abandoned sessions for standard exams
             if (remoteSession && remoteSession.state) {
               const abandonedState = remoteSession.state;
@@ -366,8 +392,8 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
         setAnswers(loadedAnswers);
         setBookmarks(loadedBookmarks);
 
-        if (data.is_reopened) {
-          setIsLateTaker(true);
+        if (data.is_reopened || isPractice) {
+          if (!isPractice) setIsLateTaker(true);
           // Late taker logic for reopened exams
           if (!loadedStartedAt) {
             // First time loading for late taker or old session fallback
@@ -920,6 +946,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                   fontSize: "18px",
                   color: "var(--ink)",
                   lineHeight: 1.5,
+                  whiteSpace: "pre-wrap",
                 }}
               >
                 {q.stem}
@@ -976,6 +1003,7 @@ export default function MockExam({ isRestDay }: { isRestDay: boolean }) {
                         fontSize: "16px",
                         color: isSelected ? "var(--accent)" : "var(--ink)",
                         lineHeight: 1.4,
+                        whiteSpace: "pre-wrap",
                         transition: "color 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       }}
                     >
