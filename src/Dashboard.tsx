@@ -6,6 +6,7 @@ import { DEFAULT_SUBJECTS, getDaysUntil } from "./App";
 import { parseQuestions } from "./MockExam";
 import { withViewTransition } from "./utils/viewTransition";
 import { Loader } from "./components/Loader";
+import { ExamTypeBadge } from "./components/ExamTypeBadge";
 
 const EXAM_DATE = new Date("2026-09-03");
 
@@ -289,7 +290,16 @@ export default function Dashboard() {
               examSets.map((set) => (
                 <div key={set.id} className="dash-set">
                   <div className="dash-set-header">
-                    <div className="dash-set-title">{set.title}</div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                      }}
+                    >
+                      <div className="dash-set-title">{set.title}</div>
+                      <ExamTypeBadge type={set.type} />
+                    </div>
                     <div className="dash-set-meta">
                       Access: {new Date(set.accessible_at).toLocaleString()}
                     </div>
@@ -730,7 +740,23 @@ export default function Dashboard() {
           <div className="modal-card" style={{ maxWidth: "600px" }}>
             <div className="modal-header">
               <div>
-                <h3 className="modal-title">Exam Summary</h3>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <h3 className="modal-title">Exam Summary</h3>
+                  <ExamTypeBadge
+                    type={
+                      examSets.find(
+                        (s) =>
+                          s.id === selectedResultForModal.exam?.exam_set_id,
+                      )?.type
+                    }
+                  />
+                </div>
                 <div
                   style={{
                     fontSize: "13px",
@@ -781,7 +807,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="modal-body" style={{ gap: "16px" }}>
+            <div
+              className="modal-body"
+              style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+            >
               {(() => {
                 const examContent = selectedResultForModal.exam?.file_content;
                 if (!examContent)

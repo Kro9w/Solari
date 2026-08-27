@@ -2107,6 +2107,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--red);
 }
 
+/* Exam set type badges (Mock/Practice/future types) — reuses the same pill
+   shape as the difficulty badges above, with its own color set so the two
+   meanings never get visually confused. */
+.dash-badge-type-mock {
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+
+.dash-badge-type-practice {
+  background: var(--sienna-bg);
+  color: var(--sienna);
+}
+
+.dash-badge-type-default {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
 /* Mini progress bar under each item-analysis option, showing the share of
    students who picked it */
 .dash-option-bar-track {

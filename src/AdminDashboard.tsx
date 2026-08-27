@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./lib/supabase";
 import { DEFAULT_SUBJECTS } from "./App";
 import { parseQuestions } from "./MockExam";
+import { ExamTypeBadge } from "./components/ExamTypeBadge";
 import { Loader } from "./components/Loader";
 import { useNavigate } from "react-router-dom";
 import icon from "../icon.png";
@@ -73,7 +74,9 @@ export default function AdminDashboard() {
   // Create Set State
   const [setTitle, setSetTitle] = useState("");
   const [setAccessibleAt, setSetAccessibleAt] = useState("");
-  const [setType, setSetType] = useState<"MOCK" | "PRACTICE">("MOCK");
+  // No exam type is pre-selected — the rest of the "Create New Exam Set"
+  // form only appears once the admin has explicitly chosen one.
+  const [setType, setSetType] = useState<"MOCK" | "PRACTICE" | "">("");
   const [creatingSet, setCreatingSet] = useState(false);
   const [setMessage, setSetMessage] = useState("");
 
@@ -159,7 +162,7 @@ export default function AdminDashboard() {
 
   const handleCreateSet = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!setTitle || (setType === "MOCK" && !setAccessibleAt)) {
+    if (!setType || !setTitle || (setType === "MOCK" && !setAccessibleAt)) {
       setSetMessage("Please fill in the required fields.");
       return;
     }
@@ -184,7 +187,7 @@ export default function AdminDashboard() {
       setSetMessage("Exam set created successfully!");
       setSetTitle("");
       setSetAccessibleAt("");
-      setSetType("MOCK");
+      setSetType("");
       await fetchExamSets();
       if (data) {
         setSelectedSet({ ...data, exams: [] });
@@ -794,7 +797,16 @@ export default function AdminDashboard() {
                           style={{ cursor: "pointer", padding: "16px 0" }}
                         >
                           <div>
-                            <div className="dash-exam-title">{set.title}</div>
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "8px",
+                              }}
+                            >
+                              <div className="dash-exam-title">{set.title}</div>
+                              <ExamTypeBadge type={set.type} />
+                            </div>
                             <div className="dash-exam-code">
                               {set.exams?.length || 0}/6 Exams uploaded
                             </div>
@@ -840,55 +852,73 @@ export default function AdminDashboard() {
                       <select
                         value={setType}
                         onChange={(e) =>
-                          setSetType(e.target.value as "MOCK" | "PRACTICE")
+                          setSetType(e.target.value as "MOCK" | "PRACTICE" | "")
                         }
                         className="dash-select"
                         style={{ width: "100%" }}
                       >
+                        <option value="" disabled>
+                          Select an exam type…
+                        </option>
                         <option value="MOCK">Mock Board Exam</option>
                         <option value="PRACTICE">Practice Exam</option>
                       </select>
                     </div>
-                    <div className="dash-field">
-                      <label className="dash-field-label">
-                        Set Title (e.g. 2026{" "}
-                        {setType === "PRACTICE" ? "Practice Exam" : "Mock Exam"}
-                        )
-                      </label>
-                      <input
-                        type="text"
-                        value={setTitle}
-                        onChange={(e) => setSetTitle(e.target.value)}
-                        required
-                        className="dash-input"
-                      />
-                    </div>
-                    {setType === "MOCK" && (
-                      <div className="dash-field">
-                        <label className="dash-field-label">
-                          Start Time (First Exam Access)
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={setAccessibleAt}
-                          onChange={(e) => setSetAccessibleAt(e.target.value)}
-                          required
-                          className="dash-input"
-                        />
+                    {setType && (
+                      <div
+                        className="fade-in"
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "18px",
+                        }}
+                      >
+                        <div className="dash-field">
+                          <label className="dash-field-label">
+                            Set Title (e.g. 2026{" "}
+                            {setType === "PRACTICE"
+                              ? "Practice Exam"
+                              : "Mock Exam"}
+                            )
+                          </label>
+                          <input
+                            type="text"
+                            value={setTitle}
+                            onChange={(e) => setSetTitle(e.target.value)}
+                            required
+                            className="dash-input"
+                          />
+                        </div>
+                        {setType === "MOCK" && (
+                          <div className="dash-field">
+                            <label className="dash-field-label">
+                              Start Time (First Exam Access)
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={setAccessibleAt}
+                              onChange={(e) =>
+                                setSetAccessibleAt(e.target.value)
+                              }
+                              required
+                              className="dash-input"
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={creatingSet}
+                          className="dash-exam-btn"
+                          style={{
+                            padding: "12px",
+                            marginTop: "12px",
+                            width: "100%",
+                          }}
+                        >
+                          {creatingSet ? "Creating…" : "Create Set & Proceed"}
+                        </button>
                       </div>
                     )}
-                    <button
-                      type="submit"
-                      disabled={creatingSet}
-                      className="dash-exam-btn"
-                      style={{
-                        padding: "12px",
-                        marginTop: "12px",
-                        width: "100%",
-                      }}
-                    >
-                      {creatingSet ? "Creating…" : "Create Set & Proceed"}
-                    </button>
                   </form>
                 </div>
               </div>
@@ -920,6 +950,7 @@ export default function AdminDashboard() {
                   <div className="dash-set-title">
                     Managing: {selectedSet.title}
                   </div>
+                  <ExamTypeBadge type={selectedSet.type} />
                 </div>
 
                 <button

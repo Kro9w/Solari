@@ -77,8 +77,10 @@ export function parseQuestions(raw: string): Question[] {
     } else if (oMatchNew && current) {
       const isCorrect = oMatchNew[1] === "*";
       const text = oMatchNew[2].trim();
-      const letters = ["A", "B", "C", "D"];
-      const letter = letters[current.options.length] || "?";
+      // Derive the option letter from its position (A, B, C, D, E, ...) so
+      // sets with more than 4 choices per question are supported instead of
+      // falling back to "?" once the old fixed A-D list was exhausted.
+      const letter = String.fromCharCode(65 + current.options.length);
 
       current.options.push({
         letter,
