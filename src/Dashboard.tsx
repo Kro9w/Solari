@@ -335,7 +335,51 @@ export default function Dashboard() {
                         </div>
 
                         {hasTaken ? (
-                          <div className="dash-exam-status">✓ Completed</div>
+                          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                            <div className="dash-exam-status">✓ Completed</div>
+                            {set.type === "PRACTICE" && (
+                              <button
+                                className="dash-exam-btn"
+                                style={{
+                                  padding: "6px 12px",
+                                  fontSize: "12px",
+                                  background: "var(--cream-dark)",
+                                  color: "var(--ink)",
+                                  border: "1px solid var(--cream-border)",
+                                }}
+                                onClick={async () => {
+                                  if (window.confirm("Are you sure you want to retake this exam? This will permanently delete your previous score and answers.")) {
+                                    try {
+                                      // Find the existing result id
+                                      const { data: existingResult, error: selectError } = await supabase
+                                        .from("exam_results")
+                                        .select("id")
+                                        .eq("user_id", user?.id)
+                                        .eq("exam_id", exam.id)
+                                        .maybeSingle();
+
+                                      if (selectError) throw selectError;
+
+                                      if (existingResult) {
+                                        await supabase.from("exam_results").delete().eq("id", existingResult.id);
+                                        await supabase.from("exam_sessions").delete().eq("user_id", user?.id).eq("exam_id", exam.id);
+                                        localStorage.removeItem(`exam_session_${user?.id}_${exam.id}`);
+                                      }
+                                      
+                                      withViewTransition(() =>
+                                        navigate(`/exam/${exam.id}`),
+                                      );
+                                    } catch (err) {
+                                      console.error("Failed to reset exam state for retake:", err);
+                                      alert("Failed to start retake due to a connection issue.");
+                                    }
+                                  }
+                                }}
+                              >
+                                Retake
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <button
                             className="dash-exam-btn"
