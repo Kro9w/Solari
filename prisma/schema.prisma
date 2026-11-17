@@ -55,16 +55,6 @@ model ExamResult {
   @@map("exam_results")
 }
 
-model AllowedSurname {
-  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  surname    String   
-  is_claimed Boolean  @default(false)
-  created_at DateTime @default(now()) @db.Timestamptz(6)
-
-  @@map("allowed_surnames")
-}
-
-
 model ExamSession {
   id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   user_id    String   @db.Uuid
@@ -77,4 +67,25 @@ model ExamSession {
 
   @@unique([user_id, exam_id])
   @@map("exam_sessions")
+}
+
+model SinagParticipant {
+  participant_id  String   @id
+  discord_user_id BigInt   @unique
+  first_name      String
+  surname         String
+  auth_user_id    String?  @unique @db.Uuid
+  assigned_at     DateTime @db.Timestamptz(6)
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  updated_at      DateTime @updatedAt @db.Timestamptz(6)
+
+  @@map("sinag_participants")
+}
+
+model SinagParticipantCounter {
+  issuance_year Int      @id
+  last_number   Int      @default(0)
+  updated_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("sinag_participant_counters")
 }

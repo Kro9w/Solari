@@ -11,8 +11,7 @@ const EXIT_MS = 260;
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [participantId, setParticipantId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
@@ -35,58 +34,16 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
-    const normalizedSurname = lastName.trim().toLowerCase();
-
-    // 1. Check if the surname is allowed (fetch all matches to handle duplicates)
-    const { data: allowedDataList, error: allowedError } = await supabase
-      .from("allowed_surnames")
-      .select("*")
-      .eq("surname", normalizedSurname);
-
-    if (allowedError) {
-      setError("Error validating surname. Please try again.");
-      setLoading(false);
-      return;
-    }
-
-    if (!allowedDataList || allowedDataList.length === 0) {
-      setError("Your surname is not on the allowed list.");
-      setLoading(false);
-      return;
-    }
-
-    // 2. Find an unclaimed slot for this surname
-    const availableSlot = allowedDataList.find((row) => !row.is_claimed);
-
-    if (!availableSlot) {
-      setError("This surname has already been registered.");
-      setLoading(false);
-      return;
-    }
-
-    // 3. Proceed with signup
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
-        },
-      },
-    });
+    // Supabase Auth owns credential creation and verification. Keep the ID
+    // only to prefill linking after the member returns from email verification.
+    const { error: signUpError } = await supabase.auth.signUp({ email, password });
 
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
     } else {
-      // 4. Mark specific surname slot as claimed
-      await supabase
-        .from("allowed_surnames")
-        .update({ is_claimed: true })
-        .eq("id", availableSlot.id);
-
-      withViewTransition(() => navigate("/"));
+      sessionStorage.setItem("sinag_pending_participant_id", participantId.trim());
+      withViewTransition(() => navigate("/login", { state: { notice: "Check your email to verify your account, then sign in to link your TSI ID." } }));
     }
   };
 
@@ -164,40 +121,24 @@ export default function Signup() {
           </div>
 
           <h2 className="auth-heading">Create your entry</h2>
-          <p className="auth-subtext">Set up your account to get started.</p>
+          <p className="auth-subtext">Create your account with your email and choose your password. Verify your email before linking your TSI ID.</p>
 
           {error && <div className="auth-error">{error}</div>}
 
           <form onSubmit={handleSignup} className="auth-form">
-            <div className="auth-field-row">
-              <div className="auth-field">
-                <label className="auth-field-label">
-                  <span className="marc-tag">100</span> Personal Name
-                </label>
-                <div className="marc-input-group">
-                  <div className="marc-indicator">0#</div>
-                  <div className="marc-subfield">$a</div>
-                  <input
-                    className="auth-input marc-input"
-                    type="text"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    required
-                    placeholder="Name"
-                  />
-                </div>
-              </div>
-              <div className="auth-field">
-                <label className="auth-field-label">&nbsp;</label>
-                <input
-                  className="auth-input"
-                  type="text"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  placeholder="Last Name"
-                />
-              </div>
+            <div className="auth-field">
+              <label className="auth-field-label" htmlFor="signup-participant-id">TSI Participant ID</label>
+              <input
+                id="signup-participant-id"
+                className="auth-input"
+                type="text"
+                autoComplete="off"
+                value={participantId}
+                onChange={(e) => setParticipantId(e.target.value)}
+                required
+                placeholder="TSI-P…"
+              />
+              <small className="auth-subtext">Use the ID issued after your participant request is approved.</small>
             </div>
             <div className="auth-field">
               <label className="auth-field-label">

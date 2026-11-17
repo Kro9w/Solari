@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { supabase } from "./lib/supabase";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import icon from "../icon.png";
 import { withViewTransition } from "./utils/viewTransition";
 
@@ -24,6 +24,8 @@ export default function Login() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const notice = (location.state as { notice?: string } | null)?.notice;
 
   useEffect(() => {
     const {
@@ -145,6 +147,7 @@ export default function Login() {
           </p>
 
           {error && <div className="auth-error">{error}</div>}
+          {notice && <div className="auth-subtext" role="status">{notice}</div>}
 
           <form onSubmit={handleLogin} className="auth-form">
             <div className="auth-field">
