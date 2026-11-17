@@ -82,9 +82,13 @@ export default function Dashboard() {
 
   if (loading) return <Loader />;
 
-  const displayName = user?.user_metadata?.first_name
-    ? `${user.user_metadata.first_name} ${user.user_metadata.last_name || ""}`.trim()
-    : "Student";
+  const displayName = user?.user_metadata?.first_name?.trim() || "Student";
+  const hour = clockNow.getHours();
+  const timeGreeting = hour < 12
+    ? "Good morning"
+    : hour < 18
+      ? "Good afternoon"
+      : "Good evening";
 
   const adminEmails = import.meta.env.VITE_ADMIN_EMAILS?.split(",") || [];
   const isAdmin = user?.email && adminEmails.includes(user.email);
@@ -196,7 +200,7 @@ export default function Dashboard() {
       <div className="dash-header">
         <div style={{ position: "relative", zIndex: 2 }}>
           <div className="dash-eyebrow">Exam Dashboard</div>
-          <h1 className="dash-heading">Welcome, {displayName}</h1>
+          <h1 className="dash-heading">{timeGreeting}, {displayName}</h1>
           <div className="live-clock" style={{ marginTop: 8 }}>
             <span className="live-clock-dot" />
             {clockNow.toLocaleDateString(undefined, {
