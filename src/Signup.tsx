@@ -37,7 +37,7 @@ export default function Signup() {
     setError(null);
 
     if (!isValidParticipantId(participantId)) {
-      setError("Enter a TSI ID like TSI-P26K7M4 (two year digits and four letters or numbers). Existing numeric IDs are also accepted.");
+      setError("This is not a valid TSI ID. Please contact our Programs Director if you think this is a mistake.");
       setLoading(false);
       return;
     }
@@ -157,7 +157,7 @@ export default function Signup() {
                 value={participantId}
                 onChange={(e) => setParticipantId(e.target.value)}
                 required
-                placeholder="TSI-P…"
+                placeholder="TSI-P… or TSI-V…"
               />
               <small className="auth-field-help">Your TSI ID confirms an issued participant record. It is not your password; sign in with the email and password you choose.</small>
             </div>

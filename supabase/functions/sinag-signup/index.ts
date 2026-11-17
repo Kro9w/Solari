@@ -8,7 +8,7 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const appOrigin = Deno.env.get("SINAG_APP_ORIGIN") ?? "";
 const rateLimitPepper = Deno.env.get("SINAG_RATE_LIMIT_PEPPER") ?? "";
 // Keep previously issued numeric IDs valid alongside the new random suffix.
-const participantIdPattern = /^TSI-P(?:\d{6,}|\d{2}[A-Z0-9]{4})$/;
+const participantIdPattern = /^TSI-[PV](?:\d{6,}|\d{2}[A-Z0-9]{4})$/;
 const genericMessage = "If your TSI ID and signup details can be registered, your account is ready. Sign in with the email and password you chose.";
 
 const admin = createClient(supabaseUrl, serviceRoleKey, {
