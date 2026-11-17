@@ -1,0 +1,4 @@
+[functions.sinag-signup]
+# Signup is public, but the function validates origin, input, participant
+# eligibility, and server-side rate limits before creating a Supabase Auth user.
+verify_jwt = false

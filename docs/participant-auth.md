@@ -1,20 +1,35 @@
 # SINAG participant signup and authentication
 
-## Current application flow
+## Signup identity flow
 
-- Signup uses Supabase Auth email/password signup and sends the member to the
-  configured email verification redirect. The member chooses their password;
-  the client creates no temporary password.
-- Signup collects the issued TSI ID and keeps it in the current browser tab's
-  `sessionStorage` only to prefill onboarding after verification. If the member
-  returns in a different browser or tab, they can enter the ID again.
-- After email verification and email/password sign-in, `/onboarding` calls the
-  existing `link_sinag_participant(p_participant_id)` RPC. It does not query
-  participant rows from the browser. Unissued, unavailable, or already-claimed
-  IDs receive the same generic link error. The client validates the deployed ID
-  shape (`TSI-P` plus six or more digits) before sending it to the RPC.
+- Signup calls the public `sinag-signup` Edge Function with the email, the
+  password chosen by the member, and their TSI ID. The browser makes no query
+  to `auth.users` or `sinag_participants`.
+- The function checks that the TSI ID matches the deployed ID format and is an
+  issued, unclaimed participant row. It then creates the account through
+  Supabase Auth with auto-confirm enabled. Participant `first_name` and
+  `surname` are copied to Auth user metadata (`first_name`, `last_name`) for
+  compatibility with existing display code; `sinag_participants` remains the
+  canonical name record.
+- The function sets `sinag_participant_id` in server-managed Auth app metadata.
+  The user cannot change this metadata through the browser. The ID is therefore
+  carried through account setup without asking the member to enter it again.
+- After email/password sign-in, `/onboarding` calls the
+  no-argument `complete_sinag_participant_link()` RPC. That function reads the
+  fixed participant ID from Auth app metadata, checks `auth.uid()` and the
+  auto-confirmed Auth state, then links the row. It accepts no client-supplied ID. Unissued,
+  unavailable, or already-claimed IDs get an account-neutral signup response.
+- The Auth account's email/password remains the credential. The TSI ID checks
+  signup eligibility and selects the participant row; it is not a password.
+  With email confirmation disabled, this flow does not prove ownership of the
+  submitted email address.
+- Sol Bot currently assigns TSI IDs without notifying participants. An
+  agreed Discord/admin process must communicate the issued ID before signup is
+  announced; this flow does not claim to deliver it.
 - Protected app and exam routes check `is_sinag_participant_linked()` and
-  require a verified Auth session. Exam sessions and results continue to use
+  require a confirmed Auth session plus participant link. Since auto-confirm
+  is enabled, `email_confirmed_at` is not proof of email ownership. Exam
+  sessions and results continue to use
   their existing Auth UUIDs.
 - Login currently supports Email. TSI ID is shown as unavailable until the
   secure server-side authentication endpoint below is deployed. The browser
@@ -26,15 +41,16 @@ The deployed contract supplied for this work defines `sinag_participants` with
 unique `participant_id`, unique `discord_user_id bigint`, and optional unique
 `auth_user_id uuid`, plus RLS/grants that prevent public table access. It
 defines `issue_sinag_participant_id(bigint,text,text)` for service-side ID
-issuance. The repository has calls to `link_sinag_participant` and
-`is_sinag_participant_linked`, but their SQL definitions are not checked into
-this checkout and the deployment database is not connected here. Before
-release, verify the deployed linking RPCs require verified `auth.uid()`, only
-link an unclaimed participant row (or safely retry the same link), enforce the
-unique Auth-to-participant relationship, and reveal no participant data.
+issuance. The repository previously referenced `link_sinag_participant` and
+`is_sinag_participant_linked`, but their SQL definitions are not present in
+this checkout and the deployment database is not connected here. The added
+migration introduces `complete_sinag_participant_link()` and revokes the
+client-callable ID-argument linking function if it exists. Verify the deployed
+RPC definition and grants before applying the migration.
 
-No participant schema changes or `allowed_surnames` retirement are included in
-this UI work.
+The deployed participant identity schema is unchanged and `allowed_surnames`
+is untouched. The additional rate-limit table stores only hashed rate buckets,
+not participant identity data.
 
 ## TSI ID login backend requirement
 
@@ -60,36 +76,53 @@ Supabase Edge Function should:
    gateway, and Auth logs redact request bodies, passwords, email addresses,
    and tokens.
 
-Required deployment configuration: deploy the Edge Function and set
-`SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` as
-server-side function secrets. Add a distributed rate-limit provider or
-gateway policy and its secret if the selected deployment platform does not
-provide suitable limits. No browser environment variable for the service-role
-key is allowed. The current account email and password remain valid for the
-future ID login; no alternate password store is required.
+Signup and linking require deploying `sinag-signup` and applying
+`202611170002_sinag_server_signup_link.sql`. Set `SUPABASE_URL`,
+`SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`),
+`SUPABASE_SERVICE_ROLE_KEY`, `SINAG_APP_ORIGIN`, and a random
+`SINAG_RATE_LIMIT_PEPPER` as server-side function secrets. `verify_jwt` is off
+because signup is unauthenticated; the function restricts CORS to
+`SINAG_APP_ORIGIN` and uses database-backed per-IP and per-ID rate limits.
+Never add the service-role key to browser environment variables.
+
+Deploy the migration and function before deploying the signup UI. The existing
+client-callable ID-argument linking RPC is revoked by the migration, so schedule
+the cutover with the new UI deployment. Already-linked accounts continue to
+work; legacy unlinked accounts need the assisted recovery path below.
 
 ## Dashboard configuration
 
-- Keep Supabase email confirmations enabled.
+- Turn **Confirm email** off in Supabase Authentication > Sign In / Providers.
+  The Edge Function requires Supabase Auth to return an auto-confirmed user and
+  session; it deletes a new account and fails closed if confirmation remains
+  enabled.
 - Add the production SINAG `/login` URL to Supabase Auth's allowed redirect
-  URLs; signup requests this URL as `emailRedirectTo`.
+  URLs; the Edge Function requests this URL as `emailRedirectTo`.
 - Keep Auth email/password rate limits and abuse protections enabled.
-- Keep existing password reset email templates and allowed redirect URLs
-  configured. Recovery remains email-based, even if TSI ID sign-in is added.
+- Password recovery still sends email through Supabase Auth. Without SMTP,
+  recovery mail may not reach reviewees; configure SMTP later if self-service
+  password recovery is needed.
+
+Existing Auth accounts created before this server-side flow may not have
+`sinag_participant_id` in app metadata. Accounts that are already linked remain
+usable. Unlinked legacy accounts need an administrator-assisted mapping or a
+separately designed verified recovery flow; the system must not guess a
+participant match from a name or email.
 
 ## Manual acceptance checks
 
-### Signup, verification, and linking
+### Signup, eligibility, and linking
 
-- A correctly formatted issued ID and valid email/password create an Auth
-  account and send a verification email; no participant row is read or changed
-  by the browser before verification.
+- A correctly formatted issued ID and valid email/password create an auto-
+  confirmed Auth
+  account, populate Auth name metadata from the participant row, bind the ID in
+  server-managed app metadata, and send no verification email. The browser does
+  not read participant or Auth rows.
 - Invalid ID format is rejected with the expected format hint. An unissued ID,
   already-linked ID, and ID linked to another Auth account all produce the same
   generic linking response without exposing another member's data.
-- Before email verification, the member cannot enter the app. After verifying
-  and signing in, the supplied ID is prefilled when available and links through
-  the RPC.
+- A signed-in user with an unlinked account is redirected to onboarding, which
+  links the already-bound ID without asking for it again.
 - Repeating a link for the same Auth user and same ID succeeds idempotently;
   another Auth user cannot claim that ID; one Auth user cannot claim a second
   ID.

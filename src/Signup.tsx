@@ -41,20 +41,22 @@ export default function Signup() {
       return;
     }
 
-    // Supabase Auth owns credential creation and verification. Keep the ID
-    // only to prefill linking after the member returns from email verification.
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: `${window.location.origin}/login` },
+    // The server checks the issued ID and binds it to the new Auth user in
+    // server-managed app_metadata. Passwords are forwarded to Supabase Auth
+    // and are never logged or stored by this application.
+    const { error: signUpError } = await supabase.functions.invoke("sinag-signup", {
+      body: {
+        email: email.trim(),
+        password,
+        participantId: normalizeParticipantId(participantId),
+      },
     });
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError("We couldn't start signup. Check your TSI ID and email, or contact an administrator if the problem continues.");
       setLoading(false);
     } else {
-      sessionStorage.setItem("sinag_pending_participant_id", normalizeParticipantId(participantId));
-      withViewTransition(() => navigate("/login", { state: { notice: "Check your email to verify your account, then sign in to link your TSI ID." } }));
+      withViewTransition(() => navigate("/login", { state: { notice: "If your TSI ID and signup details can be registered, your account is ready. Sign in with the email and password you chose to finish setup." } }));
     }
   };
 
@@ -132,7 +134,7 @@ export default function Signup() {
           </div>
 
           <h2 className="auth-heading">Create your entry</h2>
-          <p className="auth-subtext">Create your account with your email and choose your password. Verify your email before linking your TSI ID.</p>
+          <p className="auth-subtext">Create an account with your email and choose your password. Your issued TSI ID confirms you are an approved reviewee.</p>
 
           {error && <div className="auth-error">{error}</div>}
 
@@ -150,7 +152,7 @@ export default function Signup() {
                 required
                 placeholder="TSI-P…"
               />
-              <small className="auth-field-help">Your TSI ID identifies an issued participant record. It is not a password or a substitute for email verification. Use the ID provided after your participant request is approved.</small>
+              <small className="auth-field-help">Your TSI ID confirms an issued participant record. It is not your password; sign in with the email and password you choose.</small>
             </div>
             <div className="auth-field">
               <label className="auth-field-label">
