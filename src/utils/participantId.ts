@@ -1,6 +1,5 @@
-// IDs issued by the deployed contract look like TSI-P + two year digits +
-// a sequence padded to at least four digits (for example, TSI-P260001).
-const TSI_PARTICIPANT_ID_PATTERN = /^TSI-P\d{6,}$/;
+// Accept both existing sequential IDs and new year + four-character IDs.
+const TSI_PARTICIPANT_ID_PATTERN = /^TSI-P(?:\d{6,}|\d{2}[A-Z0-9]{4})$/;
 
 export function normalizeParticipantId(value: string) {
   return value.trim().toUpperCase();
