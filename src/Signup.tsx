@@ -51,7 +51,7 @@ export default function Signup() {
     // The server checks the issued ID and binds it to the new Auth user in
     // server-managed app_metadata. Passwords are forwarded to Supabase Auth
     // and are never logged or stored by this application.
-    const { error: signUpError } = await supabase.functions.invoke("sinag-signup", {
+    const { data, error: signUpError } = await supabase.functions.invoke("sinag-signup", {
       body: {
         email: email.trim(),
         password,
@@ -59,7 +59,7 @@ export default function Signup() {
       },
     });
 
-    if (signUpError) {
+    if (signUpError || data?.success !== true) {
       setError("We couldn't start signup. Check your TSI ID and email, or contact an administrator if the problem continues.");
       setLoading(false);
     } else {

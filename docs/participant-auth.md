@@ -6,11 +6,11 @@
   password chosen by the member, and their TSI ID. The browser makes no query
   to `auth.users` or `sinag_participants`.
 - The function checks that the TSI ID matches the deployed ID format and is an
-  issued, unclaimed participant row. It then creates the account through
-  Supabase Auth with auto-confirm enabled. Participant `first_name` and
-  `surname` are copied to Auth user metadata (`first_name`, `last_name`) for
-  compatibility with existing display code; `sinag_participants` remains the
-  canonical name record.
+  issued, unclaimed participant row. It then creates and confirms the Auth
+  account through the server-only Supabase Admin API. Participant `first_name`
+  and `surname` are copied to Auth user metadata (`first_name`, `last_name`)
+  for compatibility with existing display code; `sinag_participants` remains
+  the canonical name record. This flow does not send a verification email.
 - The function sets `sinag_participant_id` in server-managed Auth app metadata.
   The user cannot change this metadata through the browser. The ID is therefore
   carried through account setup without asking the member to enter it again.
@@ -80,7 +80,6 @@ Supabase Edge Function should:
 
 Signup and linking require deploying `sinag-signup` and applying
 `202611170002_sinag_server_signup_link.sql`. Set `SUPABASE_URL`,
-`SUPABASE_ANON_KEY` (or `SUPABASE_PUBLISHABLE_KEY`),
 `SUPABASE_SERVICE_ROLE_KEY`, `SINAG_APP_ORIGIN`, and a random
 `SINAG_RATE_LIMIT_PEPPER` as server-side function secrets. `verify_jwt` is off
 because signup is unauthenticated; the function restricts CORS to
@@ -94,10 +93,9 @@ work; legacy unlinked accounts need the assisted recovery path below.
 
 ## Dashboard configuration
 
-- Turn **Confirm email** off in Supabase Authentication > Sign In / Providers.
-  The Edge Function requires Supabase Auth to return an auto-confirmed user and
-  session; it deletes a new account and fails closed if confirmation remains
-  enabled.
+- Signup confirms new accounts in the trusted Edge Function because an issued
+  TSI ID is the eligibility check. No email-confirmation dashboard setting is
+  required for signup.
 - Add the production SINAG `/login` URL to Supabase Auth's allowed redirect
   URLs; the Edge Function requests this URL as `emailRedirectTo`.
 - Keep Auth email/password rate limits and abuse protections enabled.

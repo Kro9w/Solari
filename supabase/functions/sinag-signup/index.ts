@@ -1,9 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-const anonKey = Deno.env.get("SUPABASE_ANON_KEY")
-  ?? Deno.env.get("SUPABASE_PUBLISHABLE_KEY")
-  ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const appOrigin = Deno.env.get("SINAG_APP_ORIGIN") ?? "";
 const rateLimitPepper = Deno.env.get("SINAG_RATE_LIMIT_PEPPER") ?? "";
@@ -14,9 +11,6 @@ const genericMessage = "If your TSI ID and signup details can be registered, you
 const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
-const authClient = createClient(supabaseUrl, anonKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
 
 const headersFor = (origin: string | null) => ({
   "Access-Control-Allow-Origin": origin === appOrigin ? appOrigin : "null",
@@ -25,8 +19,8 @@ const headersFor = (origin: string | null) => ({
   "Vary": "Origin",
 });
 
-const respond = (origin: string | null, status = 202, message = genericMessage) =>
-  new Response(JSON.stringify({ message }), {
+const respond = (origin: string | null, status = 202, message = genericMessage, success = false) =>
+  new Response(JSON.stringify({ message, success }), {
     status,
     headers: { ...headersFor(origin), "Content-Type": "application/json" },
   });
@@ -50,7 +44,7 @@ async function consumeLimit(scope: string, value: string, maxAttempts: number) {
 Deno.serve(async (request) => {
   const origin = request.headers.get("origin");
   try {
-  if (!supabaseUrl || !anonKey || !serviceRoleKey || !appOrigin || !rateLimitPepper) {
+  if (!supabaseUrl || !serviceRoleKey || !appOrigin || !rateLimitPepper) {
     return respond(origin, 503, "Signup is temporarily unavailable. Please try again later.");
   }
   if (origin !== appOrigin) return respond(origin, 403, "Request not allowed.");
@@ -102,31 +96,21 @@ Deno.serve(async (request) => {
   }
   if (!participant || participant.auth_user_id !== null) return respond(origin);
 
-  const { data, error } = await authClient.auth.signUp({
+  // Create and confirm the Auth user in this trusted server-side function.
+  // This makes issued TSI ID eligibility the onboarding check and does not
+  // depend on the public sign-up endpoint's email-confirmation settings.
+  const { data, error } = await admin.auth.admin.createUser({
     email,
     password,
-    options: {
-      emailRedirectTo: `${appOrigin}/login`,
-      data: {
-        first_name: participant.first_name,
-        last_name: participant.surname,
-      },
+    email_confirm: true,
+    user_metadata: {
+      first_name: participant.first_name,
+      last_name: participant.surname,
     },
   });
 
   if (error || !data.user) {
-    return respond(origin, 503, "Signup is temporarily unavailable. Please try again later.");
-  }
-
-  // Supabase Auth can return an obfuscated user for an existing email. Do not
-  // bind participant metadata unless this request created an Auth identity.
-  if (!data.user.identities?.length) return respond(origin);
-
-  // This project deliberately uses an issued TSI ID as the signup eligibility
-  // check instead of email confirmation. Require Supabase Auth auto-confirm.
-  if (!data.session || !data.user.email_confirmed_at) {
-    await admin.auth.admin.deleteUser(data.user.id);
-    return respond(origin, 503, "Supabase Auth auto-confirm is not configured. Contact the SINAG administrator.");
+    return respond(origin);
   }
 
   const { error: metadataError } = await admin.auth.admin.updateUserById(data.user.id, {
@@ -141,7 +125,7 @@ Deno.serve(async (request) => {
     return respond(origin, 503, "Signup is temporarily unavailable. Please try again later.");
   }
 
-  return respond(origin);
+  return respond(origin, 202, genericMessage, true);
   } catch {
     // Do not log request data: the body contains a password.
     return respond(origin, 503, "Signup is temporarily unavailable. Please try again later.");
