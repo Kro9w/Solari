@@ -12,6 +12,7 @@ const EXIT_MS = 260;
 export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [participantId, setParticipantId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,13 @@ export default function Signup() {
     setError(null);
 
     if (!isValidParticipantId(participantId)) {
-      setError("Enter a TSI ID in the format TSI-P260001.");
+      setError("Enter a TSI ID like TSI-P26K7M4 (two year digits and four letters or numbers). Existing numeric IDs are also accepted.");
+      setLoading(false);
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
       setLoading(false);
       return;
     }
@@ -184,6 +191,24 @@ export default function Signup() {
                   autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+            <div className="auth-field">
+              <label className="auth-field-label" htmlFor="signup-confirm-password">
+                <span className="marc-tag">856</span> Confirm Password
+              </label>
+              <div className="marc-input-group">
+                <div className="marc-indicator">0#</div>
+                <div className="marc-subfield">$k</div>
+                <input
+                  id="signup-confirm-password"
+                  className="auth-input marc-input"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                 />
               </div>
