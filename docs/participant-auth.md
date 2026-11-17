@@ -48,9 +48,11 @@ migration introduces `complete_sinag_participant_link()` and revokes the
 client-callable ID-argument linking function if it exists. Verify the deployed
 RPC definition and grants before applying the migration.
 
-The deployed participant identity schema is unchanged and `allowed_surnames`
-is untouched. The additional rate-limit table stores only hashed rate buckets,
-not participant identity data.
+The offboarding cleanup migration drops `allowed_surnames` and the obsolete
+`sinag_participant_counters` table, clears exam result rows, and resets
+participant-to-Auth links while preserving issued TSI IDs and participant names.
+The rate-limit table is not participant identity data and remains required by
+the signup function.
 
 ## TSI ID login backend requirement
 
