@@ -1041,6 +1041,53 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   color: var(--ink-muted);
 }
 
+.login-identifier-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin: 0 0 12px;
+  border: 1px solid var(--cream-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.login-identifier-option {
+  min-height: 40px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-muted);
+  font: 600 14px var(--font-body);
+}
+
+.login-identifier-option.is-selected {
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.login-identifier-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.login-identifier-note,
+.auth-field-help {
+  display: block;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.login-identifier-note {
+  margin: 0 0 22px;
+}
+
+.auth-field-help {
+  margin-top: 7px;
+}
+
 @keyframes tickIn {
   from {
     opacity: 0;

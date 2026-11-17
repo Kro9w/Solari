@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import { useNavigate, Link } from "react-router-dom";
 import icon from "../icon.png";
 import { withViewTransition } from "./utils/viewTransition";
+import { isValidParticipantId, normalizeParticipantId } from "./utils/participantId";
 
 const EXAM_DATE = new Date("2026-09-03");
 const TICKS = Array.from({ length: 24 }, (_, i) => i);
@@ -34,15 +35,25 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
+    if (!isValidParticipantId(participantId)) {
+      setError("Enter a TSI ID in the format TSI-P260001.");
+      setLoading(false);
+      return;
+    }
+
     // Supabase Auth owns credential creation and verification. Keep the ID
     // only to prefill linking after the member returns from email verification.
-    const { error: signUpError } = await supabase.auth.signUp({ email, password });
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/login` },
+    });
 
     if (signUpError) {
       setError(signUpError.message);
       setLoading(false);
     } else {
-      sessionStorage.setItem("sinag_pending_participant_id", participantId.trim());
+      sessionStorage.setItem("sinag_pending_participant_id", normalizeParticipantId(participantId));
       withViewTransition(() => navigate("/login", { state: { notice: "Check your email to verify your account, then sign in to link your TSI ID." } }));
     }
   };
@@ -133,12 +144,13 @@ export default function Signup() {
                 className="auth-input"
                 type="text"
                 autoComplete="off"
+                autoCapitalize="characters"
                 value={participantId}
                 onChange={(e) => setParticipantId(e.target.value)}
                 required
                 placeholder="TSI-P…"
               />
-              <small className="auth-subtext">Use the ID issued after your participant request is approved.</small>
+              <small className="auth-field-help">Your TSI ID identifies an issued participant record. It is not a password or a substitute for email verification. Use the ID provided after your participant request is approved.</small>
             </div>
             <div className="auth-field">
               <label className="auth-field-label">
@@ -149,6 +161,7 @@ export default function Signup() {
                 <div className="marc-subfield">$u</div>
                 <input
                   className="auth-input marc-input"
+                  autoComplete="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -166,6 +179,7 @@ export default function Signup() {
                 <input
                   className="auth-input marc-input"
                   type="password"
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required

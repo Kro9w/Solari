@@ -61,7 +61,7 @@ export default function Login() {
     });
 
     if (error) {
-      setError(error.message);
+      setError("Unable to sign in with those credentials. Check them and try again.");
       setLoading(false);
     } else {
       withViewTransition(() => navigate("/"));
@@ -146,12 +146,18 @@ export default function Login() {
             Pick up your review where you left off.
           </p>
 
+          <div className="login-identifier-choice" role="group" aria-label="Choose login identifier">
+            <button type="button" className="login-identifier-option is-selected" aria-pressed="true">Email</button>
+            <button type="button" className="login-identifier-option" disabled aria-disabled="true" title="TSI ID login requires a secure server-side authentication endpoint">TSI ID</button>
+          </div>
+          <p className="login-identifier-note">Email uses your Supabase password. TSI ID login will use that same password after secure server-side sign-in is deployed; your TSI ID is never a password.</p>
+
           {error && <div className="auth-error">{error}</div>}
           {notice && <div className="auth-subtext" role="status">{notice}</div>}
 
           <form onSubmit={handleLogin} className="auth-form">
             <div className="auth-field">
-              <label className="auth-field-label">
+              <label className="auth-field-label" htmlFor="login-email">
                 <span className="marc-tag">856</span> Email
               </label>
               <div className="marc-input-group">
@@ -159,7 +165,9 @@ export default function Login() {
                 <div className="marc-subfield">$u</div>
                 <input
                   className="auth-input marc-input"
+                  id="login-email"
                   type="email"
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -167,7 +175,7 @@ export default function Login() {
               </div>
             </div>
             <div className="auth-field">
-              <label className="auth-field-label">
+              <label className="auth-field-label" htmlFor="login-password">
                 <span className="marc-tag">856</span> Password
               </label>
               <div className="marc-input-group">
@@ -175,7 +183,9 @@ export default function Login() {
                 <div className="marc-subfield">$k</div>
                 <input
                   className="auth-input marc-input"
+                  id="login-password"
                   type="password"
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -259,9 +269,9 @@ export default function Login() {
                     },
                   );
                   if (error) {
-                    setModalError(error.message);
+                    setModalError("We couldn't process that request right now. Please try again later.");
                   } else {
-                    setModalMessage("Check your email for the reset link.");
+                    setModalMessage("If an account exists for that email, a reset link will be sent.");
                   }
                   setModalLoading(false);
                 }}

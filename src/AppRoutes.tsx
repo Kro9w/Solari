@@ -21,13 +21,17 @@ const ProtectedRoute = ({
 }) => {
   const { session, loading } = useAuth();
   const location = useLocation();
-  const [linkStatus, setLinkStatus] = useState<"checking" | "linked" | "unlinked" | "error">("checking");
+  const [linkStatus, setLinkStatus] = useState<{
+    userId: string;
+    status: "checking" | "linked" | "unlinked" | "error";
+  } | null>(null);
 
   useEffect(() => {
-    if (!session || !requireParticipant || requireAdmin) return;
+    if (!session || !session.user.email_confirmed_at || !requireParticipant || requireAdmin) return;
     let active = true;
+    setLinkStatus({ userId: session.user.id, status: "checking" });
     supabase.rpc("is_sinag_participant_linked").then(({ data, error }) => {
-      if (active) setLinkStatus(error ? "error" : data ? "linked" : "unlinked");
+      if (active) setLinkStatus({ userId: session.user.id, status: error ? "error" : data ? "linked" : "unlinked" });
     });
     return () => { active = false; };
   }, [session?.user.id, requireParticipant, requireAdmin]);
@@ -60,10 +64,13 @@ const ProtectedRoute = ({
   }
 
   if (requireParticipant && !requireAdmin) {
-    if (linkStatus === "checking") return <Loader />;
-    if (linkStatus === "error") return <div className="auth-form-inner">Unable to verify participant access. Please reload or contact an administrator.</div>;
-    if (linkStatus === "unlinked" && location.pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
-    if (linkStatus === "linked" && location.pathname === "/onboarding") return <Navigate to="/" replace />;
+    if (!session.user.email_confirmed_at) {
+      return <Navigate to="/login" replace state={{ notice: "Verify your email before continuing." }} />;
+    }
+    if (linkStatus?.userId !== session.user.id || linkStatus.status === "checking") return <Loader />;
+    if (linkStatus.status === "error") return <div className="auth-form-inner">Unable to verify participant access. Please reload or contact an administrator.</div>;
+    if (linkStatus.status === "unlinked" && location.pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
+    if (linkStatus.status === "linked" && location.pathname === "/onboarding") return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
