@@ -14,11 +14,11 @@
 - The function sets `sinag_participant_id` in server-managed Auth app metadata.
   The user cannot change this metadata through the browser. The ID is therefore
   carried through account setup without asking the member to enter it again.
-- After email/password sign-in, `/onboarding` calls the
-  no-argument `complete_sinag_participant_link()` RPC. That function reads the
+- After email/password sign-in, the protected-route check calls the no-argument
+  `complete_sinag_participant_link()` RPC if needed. That function reads the
   fixed participant ID from Auth app metadata, checks `auth.uid()` and the
-  auto-confirmed Auth state, then links the row. It accepts no client-supplied ID. Unissued,
-  unavailable, or already-claimed IDs get an account-neutral signup response.
+  auto-confirmed Auth state, then links the row. It accepts no client-supplied
+  ID. The member no longer sees a separate onboarding screen.
 - The Auth account's email/password remains the credential. The TSI ID checks
   signup eligibility and selects the participant row; it is not a password.
   With email confirmation disabled, this flow does not prove ownership of the
@@ -121,8 +121,8 @@ participant match from a name or email.
 - Invalid ID format is rejected with the expected format hint. An unissued ID,
   already-linked ID, and ID linked to another Auth account all produce the same
   generic linking response without exposing another member's data.
-- A signed-in user with an unlinked account is redirected to onboarding, which
-  links the already-bound ID without asking for it again.
+- A signed-in user with an unlinked account is linked during the protected-route
+  check and only enters the app after the link is confirmed.
 - Repeating a link for the same Auth user and same ID succeeds idempotently;
   another Auth user cannot claim that ID; one Auth user cannot claim a second
   ID.

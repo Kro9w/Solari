@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import App from "./App";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Login from "./Login";
@@ -7,8 +7,12 @@ import Signup from "./Signup";
 import AdminDashboard from "./AdminDashboard";
 import MockExam from "./MockExam";
 import { Loader } from "./components/Loader";
-import ParticipantOnboarding from "./ParticipantOnboarding";
 import { supabase } from "./lib/supabase";
+
+type ParticipantGate = {
+  userId: string;
+  status: "checking" | "linking" | "ready" | "error";
+};
 
 const ProtectedRoute = ({
   children,
@@ -20,18 +24,47 @@ const ProtectedRoute = ({
   requireParticipant?: boolean;
 }) => {
   const { session, loading } = useAuth();
-  const location = useLocation();
-  const [linkStatus, setLinkStatus] = useState<{
-    userId: string;
-    status: "checking" | "linked" | "unlinked" | "error";
-  } | null>(null);
+  const [participantGate, setParticipantGate] = useState<ParticipantGate | null>(null);
+  const linkingRequest = useRef<{ userId: string; promise: Promise<boolean> } | null>(null);
+
+  const ensureParticipantLinked = (userId: string, retry = false) => {
+    if (!retry && linkingRequest.current?.userId === userId) {
+      return linkingRequest.current.promise;
+    }
+
+    const promise = (async () => {
+      const { data: alreadyLinked, error: statusError } = await supabase.rpc(
+        "is_sinag_participant_linked",
+      );
+      if (statusError) return false;
+      if (alreadyLinked) return true;
+
+      const { error: linkError } = await supabase.rpc(
+        "complete_sinag_participant_link",
+      );
+      if (linkError) return false;
+
+      const { data: linkedAfter, error: verifyError } = await supabase.rpc(
+        "is_sinag_participant_linked",
+      );
+      return !verifyError && linkedAfter === true;
+    })();
+
+    linkingRequest.current = { userId, promise };
+    return promise;
+  };
 
   useEffect(() => {
     if (!session || !session.user.email_confirmed_at || !requireParticipant || requireAdmin) return;
     let active = true;
-    setLinkStatus({ userId: session.user.id, status: "checking" });
-    supabase.rpc("is_sinag_participant_linked").then(({ data, error }) => {
-      if (active) setLinkStatus({ userId: session.user.id, status: error ? "error" : data ? "linked" : "unlinked" });
+    setParticipantGate({ userId: session.user.id, status: "checking" });
+    ensureParticipantLinked(session.user.id).then((linked) => {
+      if (active) {
+        setParticipantGate({
+          userId: session.user.id,
+          status: linked ? "ready" : "error",
+        });
+      }
     });
     return () => { active = false; };
   }, [session?.user.id, requireParticipant, requireAdmin]);
@@ -65,12 +98,29 @@ const ProtectedRoute = ({
 
   if (requireParticipant && !requireAdmin) {
     if (!session.user.email_confirmed_at) {
-      return <Navigate to="/login" replace state={{ notice: "Verify your email before continuing." }} />;
+      return <Navigate to="/login" replace state={{ notice: "Your account is not ready for participant access. Contact an administrator." }} />;
     }
-    if (linkStatus?.userId !== session.user.id || linkStatus.status === "checking") return <Loader />;
-    if (linkStatus.status === "error") return <div className="auth-form-inner">Unable to verify participant access. Please reload or contact an administrator.</div>;
-    if (linkStatus.status === "unlinked" && location.pathname !== "/onboarding") return <Navigate to="/onboarding" replace />;
-    if (linkStatus.status === "linked" && location.pathname === "/onboarding") return <Navigate to="/" replace />;
+    if (participantGate?.userId !== session.user.id || participantGate.status === "checking" || participantGate.status === "linking") {
+      return <Loader />;
+    }
+    if (participantGate.status === "error") {
+      const retryLink = async () => {
+        setParticipantGate({ userId: session.user.id, status: "linking" });
+        const linked = await ensureParticipantLinked(session.user.id, true);
+        setParticipantGate({ userId: session.user.id, status: linked ? "ready" : "error" });
+      };
+      return (
+        <div className="auth-shell">
+          <div className="auth-form-panel">
+            <div className="auth-form-inner">
+              <h2 className="auth-heading">We couldn’t finish account setup</h2>
+              <p className="auth-subtext">Your TSI ID could not be linked to this account. Please contact an administrator for help.</p>
+              <button className="auth-submit-btn" type="button" onClick={retryLink}>Try again</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
   }
 
   return <>{children}</>;
@@ -83,8 +133,6 @@ export function AppRoutes() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/onboarding" element={<ProtectedRoute><ParticipantOnboarding /></ProtectedRoute>} />
-
           <Route
             path="/"
             element={
